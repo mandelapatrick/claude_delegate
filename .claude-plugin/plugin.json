@@ -1,0 +1,14 @@
+{
+  "name": "claude-delegate",
+  "version": "0.1.0",
+  "description": "Embodied AI agent that represents you in Zoom and Google Meet meetings using your cloned voice and context",
+  "author": "mandelapatrick",
+  "skills": [
+    "list-meetings",
+    "add-agent-to-meeting",
+    "onboard",
+    "manage-brain"
+  ],
+  "mcp": true,
+  "hooks": true
+}

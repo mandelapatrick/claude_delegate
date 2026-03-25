@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "claude-delegate": {
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"],
+      "cwd": "${CLAUDE_PLUGIN_ROOT}",
+      "env": {
+        "NEXT_PUBLIC_APP_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
