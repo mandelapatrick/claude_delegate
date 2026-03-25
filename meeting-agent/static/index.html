@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Delegate</title>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.js"></script>
   <style>
     body {
       margin: 0;
@@ -16,181 +17,121 @@
       height: 100vh;
       overflow: hidden;
     }
-    #status {
-      text-align: center;
-    }
-    #status h1 {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
-    }
-    #state {
-      font-size: 1.2rem;
-      opacity: 0.7;
-    }
-    #transcript-log {
+    #status { text-align: center; }
+    #status h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    #state { font-size: 1.2rem; opacity: 0.7; }
+    #log {
       position: absolute;
       bottom: 20px;
       left: 20px;
       right: 20px;
       max-height: 200px;
       overflow-y: auto;
-      font-size: 0.8rem;
-      opacity: 0.5;
+      font-size: 0.75rem;
+      opacity: 0.4;
     }
     .listening { color: #4ade80; }
-    .thinking { color: #facc15; }
     .speaking { color: #60a5fa; }
+    .connecting { color: #facc15; }
     .error { color: #f87171; }
   </style>
 </head>
 <body>
   <div id="status">
     <h1>Claude Delegate</h1>
-    <div id="state" class="listening">Listening...</div>
+    <div id="state" class="connecting">Connecting...</div>
   </div>
-  <div id="transcript-log"></div>
+  <div id="log"></div>
+
+  <!-- Hidden audio element for agent responses -->
+  <div id="audio-container" style="display:none;"></div>
 
   <script>
     const BACKEND_URL = window.location.origin;
-    const WS_URL = 'wss://meeting-data.bot.recall.ai/api/v1/transcript';
-
-    let isSpeaking = false;
-    let transcript = [];
-
     const stateEl = document.getElementById('state');
-    const logEl = document.getElementById('transcript-log');
+    const logEl = document.getElementById('log');
+    const audioContainer = document.getElementById('audio-container');
 
-    function setState(state, text) {
-      stateEl.className = state;
+    function setState(cls, text) {
+      stateEl.className = cls;
       stateEl.textContent = text;
     }
 
     function log(msg) {
+      console.log('[delegate]', msg);
       const div = document.createElement('div');
-      div.textContent = msg;
+      div.textContent = `${new Date().toLocaleTimeString()} ${msg}`;
       logEl.appendChild(div);
       logEl.scrollTop = logEl.scrollHeight;
-      console.log('[delegate]', msg);
     }
 
-    // Connect to Recall.ai transcript WebSocket
-    function connectTranscript() {
-      log('Connecting to transcript stream...');
-      const ws = new WebSocket(WS_URL);
+    // Get room name from URL query params
+    const params = new URLSearchParams(window.location.search);
+    const roomName = params.get('room') || 'default-room';
 
-      ws.onopen = () => {
-        log('Connected to transcript stream');
-        setState('listening', 'Listening...');
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const words = data.transcript?.words || [];
-          const text = words.map(w => w.text).join(' ').trim();
-          const speaker = data.transcript?.participant?.name || 'Unknown';
-
-          if (!text) return;
-
-          log(`${speaker}: ${text}`);
-          transcript.push({ speaker, text });
-
-          if (isSpeaking) return;
-
-          // Send to backend for processing
-          await processTranscript(speaker, text);
-        } catch (e) {
-          log(`Error parsing transcript: ${e.message}`);
-        }
-      };
-
-      ws.onclose = () => {
-        log('Transcript stream disconnected, reconnecting in 2s...');
-        setTimeout(connectTranscript, 2000);
-      };
-
-      ws.onerror = (e) => {
-        log(`WebSocket error: ${e.message || 'unknown'}`);
-      };
-    }
-
-    async function processTranscript(speaker, text) {
+    async function start() {
       try {
-        setState('thinking', 'Thinking...');
+        // Step 1: Capture meeting audio
+        log('Requesting microphone access...');
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioTrack = mediaStream.getAudioTracks()[0];
+        log(`Got audio track: ${audioTrack.label}`);
 
-        const response = await fetch(`${BACKEND_URL}/api/respond`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true'
-          },
-          body: JSON.stringify({
-            speaker,
-            text,
-            transcript: transcript.slice(-20)
-          })
+        // Step 2: Get LiveKit token from our server
+        log(`Getting token for room: ${roomName}`);
+        const tokenResp = await fetch(
+          `${BACKEND_URL}/api/token?room=${encodeURIComponent(roomName)}&identity=meeting-bridge`,
+          { headers: { 'ngrok-skip-browser-warning': 'true' } }
+        );
+        const { token, url } = await tokenResp.json();
+        log(`Got token, connecting to ${url}`);
+
+        // Step 3: Connect to LiveKit room
+        const room = new LivekitClient.Room();
+
+        room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          log(`Subscribed to track from ${participant.identity}: ${track.kind}`);
+          if (track.kind === 'audio') {
+            // Attach agent's audio to play it — bot will stream this into the meeting
+            const element = track.attach();
+            audioContainer.appendChild(element);
+            log('Agent audio attached and playing');
+            setState('speaking', 'Speaking...');
+          }
         });
 
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status}`);
-        }
-
-        // Check if response is audio or JSON (skip)
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
+        room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+          track.detach().forEach(el => el.remove());
           setState('listening', 'Listening...');
-          return;
-        }
+        });
 
-        // Response is MP3 audio
-        const audioBlob = await response.blob();
-        if (audioBlob.size === 0) {
-          setState('listening', 'Listening...');
-          return;
-        }
+        room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+          log(`Participant joined: ${participant.identity}`);
+        });
 
-        await playAudio(audioBlob);
+        room.on(LivekitClient.RoomEvent.Disconnected, () => {
+          log('Disconnected from room');
+          setState('error', 'Disconnected');
+        });
+
+        await room.connect(url, token);
+        log(`Connected to room: ${room.name}`);
+
+        // Step 4: Publish meeting audio to LiveKit room
+        const localTrack = new LivekitClient.LocalAudioTrack(audioTrack);
+        await room.localParticipant.publishTrack(localTrack);
+        log('Published meeting audio to LiveKit room');
+
+        setState('listening', 'Listening...');
+        log('Bridge active — waiting for agent to join...');
+
       } catch (e) {
         log(`Error: ${e.message}`);
-        setState('listening', 'Listening...');
+        setState('error', `Error: ${e.message}`);
       }
     }
 
-    function playAudio(blob) {
-      return new Promise((resolve) => {
-        isSpeaking = true;
-        setState('speaking', 'Speaking...');
-
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-
-        audio.onended = () => {
-          isSpeaking = false;
-          URL.revokeObjectURL(url);
-          setState('listening', 'Listening...');
-          resolve();
-        };
-
-        audio.onerror = (e) => {
-          log(`Audio playback error: ${e.message || 'unknown'}`);
-          isSpeaking = false;
-          URL.revokeObjectURL(url);
-          setState('listening', 'Listening...');
-          resolve();
-        };
-
-        audio.play().catch(e => {
-          log(`Audio play failed: ${e.message}`);
-          isSpeaking = false;
-          URL.revokeObjectURL(url);
-          setState('listening', 'Listening...');
-          resolve();
-        });
-      });
-    }
-
-    // Start
-    connectTranscript();
+    start();
   </script>
 </body>
 </html>

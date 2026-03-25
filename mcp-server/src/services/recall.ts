@@ -26,7 +26,8 @@ let mockBots: RecallBot[] = [];
 export async function createBot(
   meetingUrl: string,
   botName: string,
-  agentUrl?: string
+  agentUrl?: string,
+  roomName?: string
 ): Promise<RecallBot> {
   if (hasRealApiKey()) {
     const body: Record<string, unknown> = {
@@ -34,25 +35,20 @@ export async function createBot(
       bot_name: botName,
     };
 
-    // Use Output Media to load the agent webpage in the bot's browser
-    // The webpage handles transcript reception and audio playback
-    if (agentUrl) {
+    // Use Output Media to load the bridge webpage in the bot's browser
+    // The webpage captures meeting audio and bridges it to a LiveKit room
+    if (agentUrl && roomName) {
       body.output_media = {
         camera: {
           kind: "webpage",
           config: {
-            url: agentUrl,
+            url: `${agentUrl}?room=${encodeURIComponent(roomName)}`,
           },
         },
       };
       body.recording_config = {
         include_bot_in_recording: {
           audio: true,
-        },
-        transcript: {
-          provider: {
-            recallai_streaming: {},
-          },
         },
       };
     }

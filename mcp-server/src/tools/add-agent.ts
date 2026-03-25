@@ -43,10 +43,11 @@ export async function addAgentHandler(args: {
     return `Your delegate is already assigned to "${meeting.title}".`;
   }
 
-  // Create Recall.ai bot
+  // Create Recall.ai bot with unique LiveKit room name
   const botName = `${user.name}'s Delegate`;
   const agentUrl = process.env.AGENT_WEBHOOK_URL;
-  const bot = await createBot(meeting.meetingUrl, botName, agentUrl);
+  const roomName = `meeting-${args.meeting_id.slice(0, 12)}-${Date.now()}`;
+  const bot = await createBot(meeting.meetingUrl, botName, agentUrl, roomName);
 
   // Create session record
   const session = await createAgentSession({
