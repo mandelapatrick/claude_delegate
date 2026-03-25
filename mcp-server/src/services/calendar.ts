@@ -10,90 +10,168 @@ export interface Meeting {
   hasAgent: boolean;
 }
 
-// Mock meetings for development — replace with Google Calendar API
-const MOCK_MEETINGS: Meeting[] = [
-  {
-    id: "evt_001",
-    title: "Team Standup",
-    start: getNextWeekday(1, "09:00"),
-    end: getNextWeekday(1, "09:30"),
-    duration: "30 min",
-    attendees: ["alice@company.com", "bob@company.com", "carol@company.com"],
-    meetingUrl: "https://meet.google.com/abc-defg-hij",
-    platform: "google_meet",
-    hasAgent: false,
-  },
-  {
-    id: "evt_002",
-    title: "Sprint Planning",
-    start: getNextWeekday(2, "14:00"),
-    end: getNextWeekday(2, "15:00"),
-    duration: "1 hr",
-    attendees: ["alice@company.com", "dave@company.com", "eve@company.com"],
-    meetingUrl: "https://zoom.us/j/123456789",
-    platform: "zoom",
-    hasAgent: false,
-  },
-  {
-    id: "evt_003",
-    title: "1:1 with Manager",
-    start: getNextWeekday(3, "10:00"),
-    end: getNextWeekday(3, "10:30"),
-    duration: "30 min",
-    attendees: ["manager@company.com"],
-    meetingUrl: "https://meet.google.com/klm-nopq-rst",
-    platform: "google_meet",
-    hasAgent: false,
-  },
-  {
-    id: "evt_004",
-    title: "Product Review",
-    start: getNextWeekday(4, "15:00"),
-    end: getNextWeekday(4, "16:00"),
-    duration: "1 hr",
-    attendees: [
-      "product@company.com",
-      "design@company.com",
-      "alice@company.com",
-      "bob@company.com",
-    ],
-    meetingUrl: "https://zoom.us/j/987654321",
-    platform: "zoom",
-    hasAgent: false,
-  },
-  {
-    id: "evt_005",
-    title: "All Hands",
-    start: getNextWeekday(5, "11:00"),
-    end: getNextWeekday(5, "12:00"),
-    duration: "1 hr",
-    attendees: ["all-staff@company.com"],
-    meetingUrl: "https://meet.google.com/uvw-xyza-bcd",
-    platform: "google_meet",
-    hasAgent: false,
-  },
-];
+const TOKEN_FILE = ".claude-delegate-token";
 
-function getNextWeekday(dayOffset: number, time: string): string {
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
-  const target = new Date(startOfWeek);
-  target.setDate(startOfWeek.getDate() + dayOffset - 1);
-  const [hours, minutes] = time.split(":").map(Number);
-  target.setHours(hours, minutes, 0, 0);
-  // If the date has passed, move to next week
-  if (target < now) {
-    target.setDate(target.getDate() + 7);
-  }
-  return target.toISOString();
+interface TokenData {
+  refreshToken: string;
+  accessToken?: string;
+  expiresAt?: number;
 }
 
-export async function listMeetings(): Promise<Meeting[]> {
-  // TODO: Replace with Google Calendar API call using stored OAuth token
-  // const calendar = google.calendar({ version: 'v3', auth: oauthClient });
-  // const response = await calendar.events.list({ ... });
-  return MOCK_MEETINGS;
+async function readTokenFile(): Promise<TokenData | null> {
+  const fs = await import("fs/promises");
+  const path = await import("path");
+
+  // Look for token file in project root
+  const tokenPath = path.resolve(process.cwd(), TOKEN_FILE);
+  try {
+    const data = await fs.readFile(tokenPath, "utf-8");
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
+async function writeTokenFile(data: TokenData): Promise<void> {
+  const fs = await import("fs/promises");
+  const path = await import("path");
+
+  const tokenPath = path.resolve(process.cwd(), TOKEN_FILE);
+  await fs.writeFile(tokenPath, JSON.stringify(data, null, 2));
+}
+
+async function getAccessToken(): Promise<string> {
+  const tokenData = await readTokenFile();
+  if (!tokenData?.refreshToken) {
+    throw new Error(
+      "No Google Calendar credentials found. Please sign in to the web app first (http://localhost:3000) to connect your Google Calendar."
+    );
+  }
+
+  // Return cached access token if still valid (with 60s buffer)
+  if (tokenData.accessToken && tokenData.expiresAt && Date.now() < (tokenData.expiresAt - 60) * 1000) {
+    return tokenData.accessToken;
+  }
+
+  // Refresh the access token
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in the MCP server environment."
+    );
+  }
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: tokenData.refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(
+      `Failed to refresh Google access token: ${error}. You may need to re-authenticate at http://localhost:3000.`
+    );
+  }
+
+  const data = await response.json();
+
+  // Cache the new access token
+  await writeTokenFile({
+    ...tokenData,
+    accessToken: data.access_token,
+    expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
+  });
+
+  return data.access_token;
+}
+
+export async function listMeetings(days: number = 7): Promise<Meeting[]> {
+  const accessToken = await getAccessToken();
+
+  const now = new Date();
+  const end = new Date(now);
+  end.setDate(now.getDate() + days);
+
+  const params = new URLSearchParams({
+    timeMin: now.toISOString(),
+    timeMax: end.toISOString(),
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "50",
+  });
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Google Calendar API error (${response.status}): ${error}`);
+  }
+
+  const data = await response.json();
+
+  return (data.items || [])
+    .filter((event: any) => event.start?.dateTime) // Skip all-day events
+    .map((event: any) => {
+      const meetingUrl = extractMeetingUrl(event);
+      const start = new Date(event.start.dateTime);
+      const endTime = new Date(event.end.dateTime);
+      const durationMin = Math.round((endTime.getTime() - start.getTime()) / 60000);
+      const duration =
+        durationMin >= 60
+          ? `${Math.floor(durationMin / 60)} hr${durationMin % 60 ? ` ${durationMin % 60} min` : ""}`
+          : `${durationMin} min`;
+
+      return {
+        id: event.id,
+        title: event.summary || "Untitled",
+        start: event.start.dateTime,
+        end: event.end.dateTime,
+        duration,
+        attendees: (event.attendees || []).map((a: any) => a.email),
+        meetingUrl,
+        platform: meetingUrl
+          ? meetingUrl.includes("zoom")
+            ? "zoom"
+            : "google_meet"
+          : "unknown",
+        hasAgent: false,
+      };
+    });
+}
+
+function extractMeetingUrl(event: any): string | null {
+  if (event.hangoutLink) {
+    return event.hangoutLink;
+  }
+
+  if (event.conferenceData?.entryPoints) {
+    const videoEntry = event.conferenceData.entryPoints.find(
+      (e: any) => e.entryPointType === "video"
+    );
+    if (videoEntry) return videoEntry.uri;
+  }
+
+  const text = `${event.description || ""} ${event.location || ""}`;
+  const zoomMatch = text.match(/https:\/\/[\w.-]*zoom\.us\/j\/\d+[^\s)"]*/);
+  if (zoomMatch) return zoomMatch[0];
+
+  const meetMatch = text.match(/https:\/\/meet\.google\.com\/[a-z-]+/);
+  if (meetMatch) return meetMatch[0];
+
+  return null;
 }
 
 export async function getMeetingById(

@@ -1,5 +1,9 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import { writeFile } from "fs/promises";
+import { resolve } from "path";
+
+const TOKEN_FILE = resolve(process.cwd(), "..", ".claude-delegate-token");
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -28,6 +32,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
+
+        // Save refresh token to file so the MCP server can use it
+        if (account.refresh_token) {
+          try {
+            await writeFile(
+              TOKEN_FILE,
+              JSON.stringify(
+                {
+                  refreshToken: account.refresh_token,
+                  accessToken: account.access_token,
+                  expiresAt: account.expires_at,
+                },
+                null,
+                2
+              )
+            );
+          } catch (err) {
+            console.error("Failed to save token file for MCP server:", err);
+          }
+        }
       }
       return token;
     },

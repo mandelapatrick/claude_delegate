@@ -3,7 +3,7 @@
     "claude-delegate": {
       "command": "node",
       "args": ["mcp-server/dist/index.js"],
-      "cwd": "${CLAUDE_PLUGIN_ROOT}",
+      "cwd": "/Users/mandelapatrick/Documents/claude projects/claude-delegate",
       "env": {
         "NEXT_PUBLIC_APP_URL": "http://localhost:3000"
       }

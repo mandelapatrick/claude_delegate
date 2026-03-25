@@ -20,7 +20,8 @@ export const listMeetingsToolDef = {
 export async function listMeetingsHandler(args: {
   days?: number;
 }): Promise<string> {
-  const meetings = await listMeetings();
+  const days = args.days ?? 7;
+  const meetings = await listMeetings(days);
 
   if (meetings.length === 0) {
     return "No upcoming meetings found for this week.";
