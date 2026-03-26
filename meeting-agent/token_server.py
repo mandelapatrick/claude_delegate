@@ -159,6 +159,15 @@ async def dispatch_agent(request: Request):
     if not meeting_url:
         return JSONResponse({"error": "No meeting URL"}, status_code=400)
 
+    # Look up user's voice_clone_id from Supabase
+    user_voice_id = ""
+    user_name = ""
+    if supabase and user_id:
+        result = supabase.table("users").select("voice_clone_id, name").eq("id", user_id).execute()
+        if result.data:
+            user_voice_id = result.data[0].get("voice_clone_id") or ""
+            user_name = result.data[0].get("name") or ""
+
     # Create Recall.ai bot with Output Media
     room_name = f"meeting-{meeting_id[:12]}-{int(__import__('time').time() * 1000)}"
 
@@ -168,11 +177,17 @@ async def dispatch_agent(request: Request):
     }
 
     if AGENT_WEBHOOK_URL:
+        from urllib.parse import urlencode
+        output_params = urlencode({
+            "room": room_name,
+            "voice_id": user_voice_id,
+            "user_name": user_name,
+        })
         recall_body["output_media"] = {
             "camera": {
                 "kind": "webpage",
                 "config": {
-                    "url": f"{AGENT_WEBHOOK_URL}?room={room_name}",
+                    "url": f"{AGENT_WEBHOOK_URL}?{output_params}",
                 },
             },
         }
@@ -274,18 +289,25 @@ async def onboarding_status(request: Request):
 async def get_token(
     room: str = Query(...),
     identity: str = Query(default="meeting-bridge"),
+    voice_id: str = Query(default=""),
+    user_name: str = Query(default=""),
 ):
-    """Generate LiveKit token and dispatch agent."""
+    """Generate LiveKit token and dispatch agent with user metadata."""
+    import json
+
     token = (
         AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
         .with_identity(identity)
         .with_grants(VideoGrants(room_join=True, room=room, can_publish=True, can_subscribe=True))
     )
 
+    # Pass user info as metadata so the agent can use their cloned voice
+    metadata = json.dumps({"voice_id": voice_id, "user_name": user_name})
+
     try:
         lk_api = LiveKitAPI(url=LIVEKIT_URL, api_key=LIVEKIT_API_KEY, api_secret=LIVEKIT_API_SECRET)
         await lk_api.agent_dispatch.create_dispatch(
-            CreateAgentDispatchRequest(agent_name="claude-delegate", room=room)
+            CreateAgentDispatchRequest(agent_name="claude-delegate", room=room, metadata=metadata)
         )
         await lk_api.aclose()
         print(f"[api] Dispatched agent to room: {room}")

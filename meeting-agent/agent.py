@@ -47,6 +47,24 @@ server = agents.AgentServer()
 
 @server.rtc_session(agent_name="claude-delegate")
 async def delegate_agent(ctx: agents.JobContext):
+    import json
+
+    # Read user info from dispatch metadata
+    dispatch_voice_id = voice_id  # default from env
+    dispatch_user_name = user_name  # default from env
+
+    try:
+        metadata = json.loads(ctx.room.metadata or "{}")
+        if metadata.get("voice_id"):
+            dispatch_voice_id = metadata["voice_id"]
+        if metadata.get("user_name"):
+            dispatch_user_name = metadata["user_name"]
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    print(f"[delegate] Voice ID: {dispatch_voice_id or '(default)'}")
+    print(f"[delegate] User: {dispatch_user_name}")
+
     session = AgentSession(
         stt=elevenlabs.STT(),
         llm=anthropic.LLM(
@@ -54,7 +72,7 @@ async def delegate_agent(ctx: agents.JobContext):
             temperature=0.7,
         ),
         tts=elevenlabs.TTS(
-            voice_id=voice_id,
+            voice_id=dispatch_voice_id,
             model="eleven_turbo_v2_5",
         ),
         vad=silero.VAD.load(),
@@ -66,10 +84,10 @@ async def delegate_agent(ctx: agents.JobContext):
     )
 
     print(f"[delegate] Agent joined room: {ctx.room.name}")
-    print(f"[delegate] Listening as {user_name}'s delegate...")
+    print(f"[delegate] Listening as {dispatch_user_name}'s delegate...")
 
     await session.generate_reply(
-        instructions="Greet the meeting briefly. Say hi, you're mandela's delegate, and you're here to help."
+        instructions=f"Greet the meeting briefly. Say hi, you're {dispatch_user_name}'s delegate, and you're here to help."
     )
 
 

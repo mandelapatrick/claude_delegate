@@ -68,6 +68,8 @@
     // Get room name from URL query params
     const params = new URLSearchParams(window.location.search);
     const roomName = params.get('room') || 'default-room';
+    const voiceId = params.get('voice_id') || '';
+    const userName = params.get('user_name') || '';
 
     async function start() {
       try {
@@ -80,7 +82,7 @@
         // Step 2: Get LiveKit token from our server
         log(`Getting token for room: ${roomName}`);
         const tokenResp = await fetch(
-          `${BACKEND_URL}/api/token?room=${encodeURIComponent(roomName)}&identity=meeting-bridge`,
+          `${BACKEND_URL}/api/token?room=${encodeURIComponent(roomName)}&identity=meeting-bridge&voice_id=${encodeURIComponent(voiceId)}&user_name=${encodeURIComponent(userName)}`,
           { headers: { 'ngrok-skip-browser-warning': 'true' } }
         );
         const { token, url } = await tokenResp.json();
