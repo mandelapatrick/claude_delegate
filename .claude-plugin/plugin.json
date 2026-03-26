@@ -17,5 +17,5 @@
       }
     }
   },
-  "hooks": true
+  "hooks": "./hooks/hooks.json"
 }

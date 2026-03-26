@@ -1,13 +1,14 @@
 {
-  "PostInstall": [
-    {
-      "matcher": "*",
-      "hooks": [
-        {
-          "type": "command",
-          "command": "cd ${CLAUDE_PLUGIN_ROOT}/mcp-server && npm install && npm run build"
-        }
-      ]
-    }
-  ]
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -d \"${CLAUDE_PLUGIN_ROOT}/mcp-server/node_modules\" || (cd \"${CLAUDE_PLUGIN_ROOT}/mcp-server\" && npm install && npm run build)"
+          }
+        ]
+      }
+    ]
+  }
 }
