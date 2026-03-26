@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "meeting-agent",
-      "source": ".",
+      "source": "./",
       "description": "AI meeting delegate that joins Google Meet and Zoom calls, listens, and responds using your cloned voice",
       "version": "1.0.0",
       "category": "productivity",
