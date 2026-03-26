@@ -203,7 +203,8 @@ async def dispatch_agent(request: Request):
 
     bot_data = resp.json()
     bot_id = bot_data["id"]
-    status = bot_data.get("status_changes", [{}])[0].get("code", "joining")
+    status_changes = bot_data.get("status_changes") or []
+    status = status_changes[0].get("code", "joining") if status_changes else "joining"
 
     # Create agent session in Supabase
     session_id = ""
