@@ -50,10 +50,24 @@ export async function POST(request: NextRequest) {
   const voiceId = data.voice_id;
 
   // Store voice_clone_id in Supabase users table
-  await supabase
-    .from("users")
-    .update({ voice_clone_id: voiceId })
-    .eq("email", session.user?.email);
+  // Try google_id first (primary key), fall back to email
+  const googleId = (session as any).googleId || (session as any).user?.id;
+  let result;
+  if (googleId) {
+    result = await supabase
+      .from("users")
+      .update({ voice_clone_id: voiceId })
+      .eq("google_id", googleId);
+  }
+  if (!result?.data || result?.error) {
+    result = await supabase
+      .from("users")
+      .update({ voice_clone_id: voiceId })
+      .eq("email", session.user?.email);
+  }
+  if (result?.error) {
+    console.error("[voice-clone] Supabase update error:", result.error);
+  }
 
   return NextResponse.json({
     voiceId,

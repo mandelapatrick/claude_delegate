@@ -78,19 +78,18 @@ export default function OnboardingPage() {
         });
       }
 
-      if (currentStep === STEPS.length - 3) {
-        // Leaving connectors step — upload voice and avatar
-        if (voiceBlob) {
-          const voiceForm = new FormData();
-          voiceForm.append("audio", voiceBlob, "voice.webm");
-          await fetch("/api/voice-clone", { method: "POST", body: voiceForm });
-        }
+      if (currentStep === 2 && voiceBlob) {
+        // Leaving voice step — upload immediately
+        const voiceForm = new FormData();
+        voiceForm.append("audio", voiceBlob, "voice.webm");
+        await fetch("/api/voice-clone", { method: "POST", body: voiceForm });
+      }
 
-        if (photoBlob) {
-          const photoForm = new FormData();
-          photoForm.append("photo", photoBlob, "avatar.jpg");
-          await fetch("/api/avatar", { method: "POST", body: photoForm });
-        }
+      if (currentStep === 3 && photoBlob) {
+        // Leaving avatar step — upload immediately
+        const photoForm = new FormData();
+        photoForm.append("photo", photoBlob, "avatar.jpg");
+        await fetch("/api/avatar", { method: "POST", body: photoForm });
       }
 
       if (currentStep === STEPS.length - 2) {
