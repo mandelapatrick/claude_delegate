@@ -1,11 +1,13 @@
 {
-  "description": "Claude Delegate plugin hooks",
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "mcp__claude-delegate__*",
-        "hooks": []
-      }
-    ]
-  }
+  "PostInstall": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "cd ${CLAUDE_PLUGIN_ROOT}/mcp-server && npm install && npm run build"
+        }
+      ]
+    }
+  ]
 }

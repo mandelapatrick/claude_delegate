@@ -17,12 +17,5 @@
       }
     }
   },
-  "hooks": {
-    "PostInstall": [
-      {
-        "type": "command",
-        "command": "cd ${CLAUDE_PLUGIN_ROOT}/mcp-server && npm install && npm run build"
-      }
-    ]
-  }
+  "hooks": true
 }
