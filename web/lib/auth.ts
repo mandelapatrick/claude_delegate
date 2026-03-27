@@ -30,17 +30,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.expiresAt = account.expires_at;
         token.googleId = account.providerAccountId;
 
-        // Save refresh token to Supabase connector_tokens table
-        if (account.refresh_token && account.providerAccountId) {
+        // Create/update user and save refresh token to Supabase
+        if (account.providerAccountId) {
           try {
-            // Look up the user's UUID from users table by google_id
+            // Upsert user record — ensures user exists before saving tokens
             const { data: user } = await supabase
               .from("users")
+              .upsert(
+                {
+                  google_id: account.providerAccountId,
+                  email: token.email || "",
+                  name: token.name || "",
+                },
+                { onConflict: "google_id" }
+              )
               .select("id")
-              .eq("google_id", account.providerAccountId)
               .single();
 
-            if (user?.id) {
+            // Save refresh token to connector_tokens
+            if (user?.id && account.refresh_token) {
               await supabase.from("connector_tokens").upsert(
                 {
                   user_id: user.id,
@@ -56,7 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               );
             }
           } catch (err) {
-            console.error("[auth] Failed to save token to Supabase:", err);
+            console.error("[auth] Failed to save to Supabase:", err);
           }
         }
       }
