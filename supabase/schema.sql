@@ -12,6 +12,7 @@ create table if not exists users (
   name text not null,
   voice_clone_id text,
   avatar_url text,
+  anam_avatar_id text,
   onboarding_completed boolean default false,
   connectors jsonb default '{"github": false, "slack": false, "google": false}',
   telegram_chat_id bigint unique,

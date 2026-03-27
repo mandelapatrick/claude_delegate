@@ -96,14 +96,16 @@ async def dispatch_agent(request: Request):
     if not meeting_url:
         return JSONResponse({"error": "No meeting URL"}, status_code=400)
 
-    # Look up user's voice_clone_id from Supabase
+    # Look up user's voice_clone_id and avatar from Supabase
     user_voice_id = ""
     user_name = ""
+    user_avatar_id = ""
     if supabase and user_id:
-        result = supabase.table("users").select("voice_clone_id, name").eq("id", user_id).execute()
+        result = supabase.table("users").select("voice_clone_id, name, anam_avatar_id").eq("id", user_id).execute()
         if result.data:
             user_voice_id = result.data[0].get("voice_clone_id") or ""
             user_name = result.data[0].get("name") or ""
+            user_avatar_id = result.data[0].get("anam_avatar_id") or ""
 
     # Create Recall.ai bot with Output Media
     room_name = f"meeting-{meeting_id[:12]}-{int(__import__('time').time() * 1000)}"
@@ -120,6 +122,7 @@ async def dispatch_agent(request: Request):
             "voice_id": user_voice_id,
             "user_name": user_name,
             "user_context": user_context,
+            "avatar_id": user_avatar_id,
         })
         recall_body["output_media"] = {
             "camera": {
@@ -228,6 +231,7 @@ async def get_token(
     identity: str = Query(default="meeting-bridge"),
     voice_id: str = Query(default=""),
     user_name: str = Query(default=""),
+    avatar_id: str = Query(default=""),
 ):
     """Generate LiveKit token and dispatch agent with user metadata."""
     import json
@@ -238,8 +242,8 @@ async def get_token(
         .with_grants(VideoGrants(room_join=True, room=room, can_publish=True, can_subscribe=True))
     )
 
-    # Pass user info as metadata so the agent can use their cloned voice
-    metadata = json.dumps({"voice_id": voice_id, "user_name": user_name})
+    # Pass user info as metadata so the agent can use their cloned voice and avatar
+    metadata = json.dumps({"voice_id": voice_id, "user_name": user_name, "avatar_id": avatar_id})
 
     try:
         lk_api = LiveKitAPI(url=LIVEKIT_URL, api_key=LIVEKIT_API_KEY, api_secret=LIVEKIT_API_SECRET)

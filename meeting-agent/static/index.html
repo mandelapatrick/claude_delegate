@@ -37,7 +37,11 @@
   </style>
 </head>
 <body>
-  <div id="status">
+  <!-- Avatar video (full viewport, behind status overlay) -->
+  <video id="avatar-video" autoplay playsinline muted
+         style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:none;z-index:0;"></video>
+
+  <div id="status" style="z-index:1;position:relative;">
     <h1>Claude Delegate</h1>
     <div id="state" class="connecting">Connecting...</div>
   </div>
@@ -94,16 +98,31 @@
         room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
           log(`Subscribed to track from ${participant.identity}: ${track.kind}`);
           if (track.kind === 'audio') {
-            // Attach agent's audio to play it — bot will stream this into the meeting
+            // Attach audio to play it — bot will stream this into the meeting
             const element = track.attach();
             audioContainer.appendChild(element);
-            log('Agent audio attached and playing');
+            log('Audio attached and playing');
             setState('speaking', 'Speaking...');
+          } else if (track.kind === 'video') {
+            // Avatar video track — render fullscreen for Recall.ai Output Media
+            const videoEl = document.getElementById('avatar-video');
+            track.attach(videoEl);
+            videoEl.style.display = 'block';
+            document.getElementById('status').style.display = 'none';
+            log(`Avatar video attached from ${participant.identity}`);
           }
         });
 
         room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
-          track.detach().forEach(el => el.remove());
+          if (track.kind === 'video') {
+            const videoEl = document.getElementById('avatar-video');
+            track.detach(videoEl);
+            videoEl.style.display = 'none';
+            document.getElementById('status').style.display = '';
+            log('Avatar video detached');
+          } else {
+            track.detach().forEach(el => el.remove());
+          }
           setState('listening', 'Listening...');
         });
 
