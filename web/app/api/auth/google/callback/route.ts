@@ -55,27 +55,49 @@ export async function GET(request: NextRequest) {
   const picture = idTokenPayload.picture || "";
   const googleId = idTokenPayload.sub;
 
-  // Upsert user — auto-create from Google profile
-  const { data: user, error: userErr } = await supabase
+  // Create or update user from Google profile
+  // Try insert first, then update if user already exists
+  let userId: string;
+
+  const { data: existing } = await supabase
     .from("users")
-    .upsert(
-      {
+    .select("id")
+    .eq("email", email)
+    .single();
+
+  if (existing) {
+    // Update existing user with Google profile
+    await supabase
+      .from("users")
+      .update({
+        name,
+        google_id: googleId,
+        avatar_url: picture,
+        connectors: { github: false, slack: false, google: true },
+      })
+      .eq("id", existing.id);
+    userId = existing.id;
+  } else {
+    // Create new user
+    const { data: newUser, error: insertErr } = await supabase
+      .from("users")
+      .insert({
         email,
         name,
         google_id: googleId,
         avatar_url: picture,
         connectors: { github: false, slack: false, google: true },
-      },
-      { onConflict: "email" }
-    )
-    .select("id")
-    .single();
+      })
+      .select("id")
+      .single();
 
-  if (userErr || !user) {
-    console.error("User upsert failed:", userErr);
-    return NextResponse.redirect(
-      `${appUrl}/onboarding?session=${session}&google=error&reason=user_create`
-    );
+    if (insertErr || !newUser) {
+      console.error("User create failed:", insertErr);
+      return NextResponse.redirect(
+        `${appUrl}/onboarding?session=${session}&google=error&reason=user_create`
+      );
+    }
+    userId = newUser.id;
   }
 
   // Store tokens in connector_tokens
@@ -83,7 +105,7 @@ export async function GET(request: NextRequest) {
 
   await supabase.from("connector_tokens").upsert(
     {
-      user_id: user.id,
+      user_id: userId,
       provider: "google",
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
@@ -99,7 +121,7 @@ export async function GET(request: NextRequest) {
   await supabase
     .from("users")
     .update({ telegram_link_token: telegramLinkToken })
-    .eq("id", user.id);
+    .eq("id", userId);
 
   // Redirect back to onboarding at the voice step with profile data
   const redirectParams = new URLSearchParams({
