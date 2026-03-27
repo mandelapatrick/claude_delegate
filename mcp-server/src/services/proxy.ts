@@ -6,61 +6,69 @@
 const PROXY_URL =
   process.env.PROXY_URL || "https://meeting-agent-h4ny.onrender.com";
 
-function getTokenDir(): string {
-  const os = require("os");
-  const path = require("path");
-  return path.join(os.homedir(), ".claude-delegate");
+/**
+ * Read identity from env vars (set in .mcp.json by onboarding).
+ * Falls back to legacy file locations for backward compat.
+ */
+async function readIdentity(): Promise<Record<string, unknown> | null> {
+  // Primary: env vars injected into .mcp.json (always works in sandbox)
+  if (process.env.DELEGATE_GOOGLE_ID || process.env.DELEGATE_EMAIL) {
+    return {
+      googleId: process.env.DELEGATE_GOOGLE_ID,
+      email: process.env.DELEGATE_EMAIL,
+      name: process.env.DELEGATE_NAME,
+    };
+  }
+
+  // Legacy fallback: read from file
+  const fs = await import("fs/promises");
+  const os = await import("os");
+  const path = await import("path");
+  const locations = [
+    path.join(os.homedir(), ".claude-delegate", "identity.json"),
+    path.resolve(process.cwd(), ".claude-delegate", "identity.json"),
+    path.resolve(process.cwd(), ".claude-delegate-token"),
+  ];
+  for (const loc of locations) {
+    try {
+      const data = await fs.readFile(loc, "utf-8");
+      return JSON.parse(data);
+    } catch {}
+  }
+  return null;
 }
 
-function getTokenPath(): string {
-  const path = require("path");
-  return path.join(getTokenDir(), "identity.json");
-}
-
-function getCwdTokenDir(): string {
-  const path = require("path");
-  return path.join(process.cwd(), ".claude-delegate");
-}
-
-function getCwdTokenPath(): string {
-  const path = require("path");
-  return path.join(getCwdTokenDir(), "identity.json");
-}
-
-async function readTokenFile(): Promise<Record<string, unknown> | null> {
+/**
+ * Save identity to .mcp.json env vars so the MCP server can read them
+ * without file I/O (avoids sandbox issues).
+ */
+export async function saveIdentity(identity: {
+  googleId: string;
+  email: string;
+  name: string;
+}): Promise<void> {
   const fs = await import("fs/promises");
   const path = await import("path");
-  // Try home directory first
-  try {
-    const data = await fs.readFile(getTokenPath(), "utf-8");
-    return JSON.parse(data);
-  } catch {}
-  // Try cwd-based location (works inside sandbox)
-  try {
-    const data = await fs.readFile(getCwdTokenPath(), "utf-8");
-    return JSON.parse(data);
-  } catch {}
-  // Legacy fallback
-  try {
-    const oldPath = path.resolve(process.cwd(), ".claude-delegate-token");
-    const data = await fs.readFile(oldPath, "utf-8");
-    return JSON.parse(data);
-  } catch {
-    return null;
-  }
-}
 
-export async function writeTokenFile(data: Record<string, unknown>): Promise<void> {
-  const fs = await import("fs/promises");
-  // Primary: home directory
-  await fs.mkdir(getTokenDir(), { recursive: true });
-  await fs.writeFile(getTokenPath(), JSON.stringify(data, null, 2));
-  // Secondary: cwd (accessible inside sandbox)
+  // Find .mcp.json — check cwd, then look for CLAUDE.md-adjacent
+  const mcpPath = path.resolve(process.cwd(), ".mcp.json");
+  let config: any;
   try {
-    await fs.mkdir(getCwdTokenDir(), { recursive: true });
-    await fs.writeFile(getCwdTokenPath(), JSON.stringify(data, null, 2));
+    config = JSON.parse(await fs.readFile(mcpPath, "utf-8"));
   } catch {
-    // Best-effort; cwd may not be writable
+    config = { mcpServers: {} };
+  }
+
+  // Inject identity as env vars into the claude-delegate server config
+  const server = config.mcpServers?.["claude-delegate"];
+  if (server) {
+    server.env = {
+      ...server.env,
+      DELEGATE_GOOGLE_ID: identity.googleId,
+      DELEGATE_EMAIL: identity.email,
+      DELEGATE_NAME: identity.name,
+    };
+    await fs.writeFile(mcpPath, JSON.stringify(config, null, 2) + "\n");
   }
 }
 
@@ -79,7 +87,7 @@ export interface Meeting {
 }
 
 export async function listMeetings(days: number = 7): Promise<Meeting[]> {
-  const tokenData = await readTokenFile();
+  const tokenData = await readIdentity();
   if (!tokenData?.googleId && !tokenData?.email) {
     throw new Error(
       "No identity found. Run `/onboard` to connect your Google Calendar."
@@ -204,7 +212,7 @@ export interface OnboardingStatus {
 }
 
 export async function getOnboardingStatus(): Promise<OnboardingStatus> {
-  const tokenData = await readTokenFile();
+  const tokenData = await readIdentity();
   if (!tokenData) {
     return {
       completed: false,

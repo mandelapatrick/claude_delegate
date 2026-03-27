@@ -1,4 +1,4 @@
-import { getOnboardingStatus, getAppUrl, writeTokenFile } from "../services/proxy.js";
+import { getOnboardingStatus, getAppUrl, saveIdentity } from "../services/proxy.js";
 
 export const getOnboardingStatusToolDef = {
   name: "get_onboarding_status",
@@ -86,12 +86,12 @@ export async function openOnboardingHandler(): Promise<string> {
         if (resp.ok) {
           const data = await resp.json();
           if (data.completed && data.user) {
-            await writeTokenFile({
+            await saveIdentity({
               googleId: data.user.googleId,
               email: data.user.email,
               name: data.user.name,
             });
-            console.log("[onboarding] Identity saved");
+            console.log("[onboarding] Identity saved to .mcp.json env vars");
             return;
           }
         }
