@@ -6,12 +6,30 @@
 const PROXY_URL =
   process.env.PROXY_URL || "https://meeting-agent-h4ny.onrender.com";
 
+function getTokenDir(): string {
+  const os = require("os");
+  const path = require("path");
+  return path.join(os.homedir(), ".claude-delegate");
+}
+
+function getTokenPath(): string {
+  const path = require("path");
+  return path.join(getTokenDir(), "identity.json");
+}
+
 async function readTokenFile(): Promise<Record<string, unknown> | null> {
   const fs = await import("fs/promises");
   const path = await import("path");
-  const tokenPath = path.resolve(process.cwd(), ".claude-delegate-token");
+  // Try new location first
   try {
-    const data = await fs.readFile(tokenPath, "utf-8");
+    const data = await fs.readFile(getTokenPath(), "utf-8");
+    return JSON.parse(data);
+  } catch {
+    // Fall back to old cwd-based location for backward compat
+  }
+  try {
+    const oldPath = path.resolve(process.cwd(), ".claude-delegate-token");
+    const data = await fs.readFile(oldPath, "utf-8");
     return JSON.parse(data);
   } catch {
     return null;
@@ -20,9 +38,8 @@ async function readTokenFile(): Promise<Record<string, unknown> | null> {
 
 async function writeTokenFile(data: Record<string, unknown>): Promise<void> {
   const fs = await import("fs/promises");
-  const path = await import("path");
-  const tokenPath = path.resolve(process.cwd(), ".claude-delegate-token");
-  await fs.writeFile(tokenPath, JSON.stringify(data, null, 2));
+  await fs.mkdir(getTokenDir(), { recursive: true });
+  await fs.writeFile(getTokenPath(), JSON.stringify(data, null, 2));
 }
 
 // ---- Meetings ----

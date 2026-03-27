@@ -86,13 +86,13 @@ export async function openOnboardingHandler(): Promise<string> {
         if (resp.ok) {
           const data = await resp.json();
           if (data.completed && data.user) {
-            // Write identity-only token file
+            // Write identity-only token file to ~/.claude-delegate/
             const fs = await import("fs/promises");
+            const os = await import("os");
             const path = await import("path");
-            const tokenPath = path.resolve(
-              process.cwd(),
-              ".claude-delegate-token"
-            );
+            const tokenDir = path.join(os.homedir(), ".claude-delegate");
+            const tokenPath = path.join(tokenDir, "identity.json");
+            await fs.mkdir(tokenDir, { recursive: true });
             await fs.writeFile(
               tokenPath,
               JSON.stringify(
@@ -106,7 +106,7 @@ export async function openOnboardingHandler(): Promise<string> {
               )
             );
             console.log(
-              "[onboarding] Identity saved to .claude-delegate-token"
+              "[onboarding] Identity saved to", tokenPath
             );
             return;
           }
