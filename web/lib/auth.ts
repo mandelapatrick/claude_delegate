@@ -33,35 +33,43 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Create/update user and save refresh token to Supabase
         if (account.providerAccountId) {
           try {
-            // Upsert user record — ensures user exists before saving tokens
+            // Ensure user exists
+            await supabase.from("users").upsert(
+              {
+                google_id: account.providerAccountId,
+                email: token.email || "",
+                name: token.name || "",
+              },
+              { onConflict: "google_id" }
+            );
+
+            // Fetch user UUID (separate query to guarantee result)
             const { data: user } = await supabase
               .from("users")
-              .upsert(
-                {
-                  google_id: account.providerAccountId,
-                  email: token.email || "",
-                  name: token.name || "",
-                },
-                { onConflict: "google_id" }
-              )
               .select("id")
+              .eq("google_id", account.providerAccountId)
               .single();
 
             // Save refresh token to connector_tokens
             if (user?.id && account.refresh_token) {
-              await supabase.from("connector_tokens").upsert(
-                {
-                  user_id: user.id,
-                  provider: "google",
-                  access_token: account.access_token || "",
-                  refresh_token: account.refresh_token,
-                  expires_at: account.expires_at
-                    ? new Date(account.expires_at * 1000).toISOString()
-                    : null,
-                  scopes: ["calendar.readonly", "calendar.events.readonly"],
-                },
-                { onConflict: "user_id,provider" }
-              );
+              const { error: tokenError } = await supabase
+                .from("connector_tokens")
+                .upsert(
+                  {
+                    user_id: user.id,
+                    provider: "google",
+                    access_token: account.access_token || "",
+                    refresh_token: account.refresh_token,
+                    expires_at: account.expires_at
+                      ? new Date(account.expires_at * 1000).toISOString()
+                      : null,
+                    scopes: ["calendar.readonly", "calendar.events.readonly"],
+                  },
+                  { onConflict: "user_id,provider" }
+                );
+              if (tokenError) {
+                console.error("[auth] connector_tokens upsert error:", tokenError);
+              }
             }
           } catch (err) {
             console.error("[auth] Failed to save to Supabase:", err);
