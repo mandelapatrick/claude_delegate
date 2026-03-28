@@ -10,7 +10,6 @@ listens, responds when addressed, and publishes audio back.
 """
 
 import os
-from collections.abc import AsyncIterable
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,9 +17,8 @@ from dotenv import load_dotenv
 # Load .env from project root
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from livekit import agents, rtc
+from livekit import agents
 from livekit.agents import AgentSession, Agent, room_io
-from livekit.agents.voice import ModelSettings
 from livekit.agents.llm import StopResponse
 from livekit.plugins import elevenlabs, silero, anthropic, anam
 
@@ -55,12 +53,7 @@ class MeetingDelegate(Agent):
 
 ROLE: You represent {name} when they cannot attend. You speak on their behalf using their knowledge base. You are NOT {name} — you are their delegate.
 
-TURN-TAKING:
-- ONLY speak when directly addressed ("{name}", "delegate", "{name}'s delegate")
-- ONLY speak when someone asks a factual question clearly within your knowledge
-- Stay SILENT for: cross-talk between others, rhetorical questions, questions directed at other people, thinking aloud
-- When unsure if you're being addressed, stay silent — missing a turn is better than interrupting
-- To stay silent, respond with exactly "..."
+WHEN YOU RECEIVE A TRANSCRIPT, ALWAYS RESPOND. The system has already filtered out irrelevant speech — if you receive it, someone is talking to you or asking a question relevant to your knowledge. Answer helpfully and concisely.
 
 WHAT YOU CAN DO:
 - Share status updates, timelines, and progress from {name}'s knowledge base
@@ -121,27 +114,6 @@ STYLE:
 
         print(f"[gate] PASS — sending to LLM")
 
-    async def tts_node(
-        self, text: AsyncIterable[str], model_settings: ModelSettings
-    ):
-        """Filter out '...' silence responses before they reach TTS."""
-        collected = ""
-        chunks: list[str] = []
-        async for chunk in text:
-            collected += chunk
-            chunks.append(chunk)
-
-        # If the LLM decided to stay silent, produce no audio
-        if collected.strip() in ("...", "…", ""):
-            return
-
-        # Otherwise, yield chunks to default TTS
-        async def _replay():
-            for c in chunks:
-                yield c
-
-        async for frame in Agent.default.tts_node(self, _replay(), model_settings):
-            yield frame
 
 
 server = agents.AgentServer()
