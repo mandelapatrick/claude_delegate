@@ -128,6 +128,7 @@ async def dispatch_agent(request: Request):
             "user_context": user_context,
             "avatar_id": user_avatar_id if mode == "video" else "",
             "avatar_url": user_avatar_url,
+            "meeting_title": meeting_title,
         })
         recall_body["output_media"] = {
             "camera": {
@@ -239,6 +240,8 @@ async def get_token(
     user_name: str = Query(default=""),
     avatar_id: str = Query(default=""),
     avatar_url: str = Query(default=""),
+    user_context: str = Query(default=""),
+    meeting_title: str = Query(default="Meeting"),
 ):
     """Generate LiveKit token and dispatch agent with user metadata."""
     import json
@@ -250,7 +253,13 @@ async def get_token(
     )
 
     # Pass user info as metadata so the agent can use their cloned voice and avatar
-    metadata = json.dumps({"voice_id": voice_id, "user_name": user_name, "avatar_id": avatar_id})
+    metadata = json.dumps({
+        "voice_id": voice_id,
+        "user_name": user_name,
+        "avatar_id": avatar_id,
+        "user_context": request.query_params.get("user_context", ""),
+        "meeting_title": request.query_params.get("meeting_title", "Meeting"),
+    })
 
     try:
         lk_api = LiveKitAPI(url=LIVEKIT_URL, api_key=LIVEKIT_API_KEY, api_secret=LIVEKIT_API_SECRET)
