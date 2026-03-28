@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Delegate</title>
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@anam-ai/js-sdk@latest/dist/bundle.esm.js"></script>
   <style>
     body {
       margin: 0;
@@ -38,7 +39,7 @@
 </head>
 <body>
   <!-- Avatar video (full viewport, behind status overlay) -->
-  <video id="avatar-video" autoplay playsinline muted
+  <video id="avatar-video" autoplay playsinline
          style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:none;z-index:0;"></video>
 
   <div id="status" style="z-index:1;position:relative;">
@@ -50,7 +51,9 @@
   <!-- Hidden audio element for agent responses -->
   <div id="audio-container" style="display:none;"></div>
 
-  <script>
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@anam-ai/js-sdk@latest/dist/bundle.esm.js";
+
     const BACKEND_URL = window.location.origin;
     const stateEl = document.getElementById('state');
     const logEl = document.getElementById('log');
@@ -76,15 +79,52 @@
     const userName = params.get('user_name') || '';
     const avatarId = params.get('avatar_id') || '';
 
+    async function startAnamAvatar() {
+      if (!avatarId) return null;
+
+      try {
+        log(`Starting Anam avatar: ${avatarId}`);
+        const resp = await fetch(`${BACKEND_URL}/api/anam-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatarId, name: userName || 'Delegate' }),
+        });
+
+        if (!resp.ok) {
+          log(`Anam session error: ${resp.status}`);
+          return null;
+        }
+
+        const { sessionToken } = await resp.json();
+        log('Got Anam session token');
+
+        const anamClient = createClient(sessionToken);
+        await anamClient.streamToVideoElement('avatar-video');
+
+        // Show avatar video, hide status text
+        document.getElementById('avatar-video').style.display = 'block';
+        document.getElementById('status').style.display = 'none';
+        log('Anam avatar streaming');
+
+        return anamClient;
+      } catch (e) {
+        log(`Anam avatar failed: ${e.message}`);
+        return null;
+      }
+    }
+
     async function start() {
       try {
-        // Step 1: Capture meeting audio
+        // Step 1: Start Anam avatar (non-blocking, runs in parallel)
+        const anamPromise = startAnamAvatar();
+
+        // Step 2: Capture meeting audio
         log('Requesting microphone access...');
         const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const audioTrack = mediaStream.getAudioTracks()[0];
         log(`Got audio track: ${audioTrack.label}`);
 
-        // Step 2: Get LiveKit token from our server
+        // Step 3: Get LiveKit token from our server
         log(`Getting token for room: ${roomName}`);
         const tokenResp = await fetch(
           `${BACKEND_URL}/api/token?room=${encodeURIComponent(roomName)}&identity=meeting-bridge&voice_id=${encodeURIComponent(voiceId)}&user_name=${encodeURIComponent(userName)}&avatar_id=${encodeURIComponent(avatarId)}`,
@@ -93,7 +133,10 @@
         const { token, url } = await tokenResp.json();
         log(`Got token, connecting to ${url}`);
 
-        // Step 3: Connect to LiveKit room
+        // Wait for Anam avatar to be ready
+        const anamClient = await anamPromise;
+
+        // Step 4: Connect to LiveKit room
         const room = new LivekitClient.Room();
 
         room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
@@ -104,26 +147,11 @@
             audioContainer.appendChild(element);
             log('Audio attached and playing');
             setState('speaking', 'Speaking...');
-          } else if (track.kind === 'video') {
-            // Avatar video track — render fullscreen for Recall.ai Output Media
-            const videoEl = document.getElementById('avatar-video');
-            track.attach(videoEl);
-            videoEl.style.display = 'block';
-            document.getElementById('status').style.display = 'none';
-            log(`Avatar video attached from ${participant.identity}`);
           }
         });
 
         room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
-          if (track.kind === 'video') {
-            const videoEl = document.getElementById('avatar-video');
-            track.detach(videoEl);
-            videoEl.style.display = 'none';
-            document.getElementById('status').style.display = '';
-            log('Avatar video detached');
-          } else {
-            track.detach().forEach(el => el.remove());
-          }
+          track.detach().forEach(el => el.remove());
           setState('listening', 'Listening...');
         });
 
@@ -139,20 +167,12 @@
         await room.connect(url, token);
         log(`Connected to room: ${room.name}`);
 
-        // Step 4: Publish meeting audio to LiveKit room
+        // Step 5: Publish meeting audio to LiveKit room
         await room.localParticipant.publishTrack(audioTrack, {
           source: LivekitClient.Track.Source.Microphone,
           name: 'meeting-audio',
         });
         log('Published meeting audio to LiveKit room');
-
-        // Log track stats periodically
-        setInterval(() => {
-          const pub = room.localParticipant.audioTrackPublications;
-          pub.forEach((p) => {
-            log(`Track ${p.trackName}: enabled=${p.track?.mediaStreamTrack?.enabled}, muted=${p.isMuted}`);
-          });
-        }, 5000);
 
         setState('listening', 'Listening...');
         log('Bridge active — waiting for agent to join...');

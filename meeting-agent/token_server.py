@@ -45,6 +45,7 @@ RECALL_REGION = os.getenv("RECALL_REGION", "us-west-2")
 RECALL_BASE_URL = f"https://{RECALL_REGION}.recall.ai/api/v1"
 
 AGENT_WEBHOOK_URL = os.getenv("AGENT_WEBHOOK_URL", "")
+ANAM_API_KEY = os.getenv("ANAM_API_KEY", "")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if create_client and SUPABASE_URL and SUPABASE_KEY else None
 
@@ -219,6 +220,44 @@ async def onboarding_status(request: Request):
             "paraSetup": True,
         },
     })
+
+
+# ---------------------------------------------------------------------------
+# Anam avatar session token
+# ---------------------------------------------------------------------------
+
+@app.post("/api/anam-session")
+async def create_anam_session(request: Request):
+    """Create an Anam session token for avatar rendering in the bridge page."""
+    body = await request.json()
+    avatar_id = body.get("avatarId", "")
+
+    if not avatar_id or not ANAM_API_KEY:
+        return JSONResponse({"error": "Missing avatarId or ANAM_API_KEY"}, status_code=400)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://api.anam.ai/v1/auth/session-token",
+            headers={
+                "Authorization": f"Bearer {ANAM_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "personaConfig": {
+                    "avatarId": avatar_id,
+                    "name": body.get("name", "Delegate"),
+                },
+            },
+            timeout=15.0,
+        )
+
+    if not resp.is_success:
+        return JSONResponse(
+            {"error": f"Anam API error ({resp.status_code}): {resp.text}"},
+            status_code=resp.status_code,
+        )
+
+    return JSONResponse(resp.json())
 
 
 # ---------------------------------------------------------------------------
