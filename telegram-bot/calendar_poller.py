@@ -265,10 +265,7 @@ async def _poll_user(
         if meeting_url:
             cache_key = _cache_meeting(event_id, meeting_url, summary)
             buttons.append([
-                InlineKeyboardButton("Audio Delegate", callback_data=f"audio:{cache_key}"),
-                InlineKeyboardButton("Send with Context", callback_data=f"context:{cache_key}"),
-            ])
-            buttons.append([
+                InlineKeyboardButton("Send Agent", callback_data=f"context:{cache_key}"),
                 InlineKeyboardButton("Skip", callback_data=f"skip:{cache_key}"),
             ])
         else:
