@@ -230,7 +230,8 @@ async def _poll_user(
 
     for event in events_result.get("items", []):
         event_id = event["id"]
-        if event_id in _notified:
+        notif_key = f"{user['id']}:{event_id}"
+        if notif_key in _notified:
             continue
 
         summary = event.get("summary", "Untitled Meeting")
@@ -288,4 +289,4 @@ async def _poll_user(
         # Mark as notified (expire after event end time + buffer)
         end = event["end"].get("dateTime", event["end"].get("date"))
         end_dt = datetime.fromisoformat(end)
-        _notified[event_id] = end_dt + timedelta(minutes=5)
+        _notified[notif_key] = end_dt + timedelta(minutes=5)
