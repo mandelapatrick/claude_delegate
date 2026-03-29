@@ -2,6 +2,7 @@
 
 import logging
 import os
+from datetime import datetime, timezone
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -18,7 +19,7 @@ from telegram.ext import (
     filters,
 )
 
-from calendar_poller import poll_all_users, get_cached_meeting, list_meetings_for_user
+from calendar_poller import poll_all_users, get_cached_meeting, list_meetings_for_user, _cache_meeting
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -149,24 +150,52 @@ async def meetings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("No upcoming meetings found for today.")
         return
 
-    lines = [f"You have {len(meetings)} upcoming meeting(s) today:\n"]
     for m in meetings:
-        time_str = m["start_dt"].strftime("%I:%M %p")
+        now_dt = datetime.now(timezone.utc)
+        delta = m["start_dt"] - now_dt
+        minutes = max(1, int(delta.total_seconds() / 60))
+        if minutes >= 60:
+            time_str = f"in {minutes // 60}h {minutes % 60}m"
+        else:
+            time_str = f"in {minutes} min"
+
         attendee_str = ""
         if m["attendees"]:
             names = m["attendees"][:3]
             attendee_str = ", ".join(names)
             if len(m["attendees"]) > 3:
                 attendee_str += f" +{len(m['attendees']) - 3} more"
-            attendee_str = f"\n   With: {attendee_str}"
 
-        link_str = ""
+        lines = [f"Meeting {time_str}", f'"{m["summary"]}"']
+        if attendee_str:
+            lines.append(f"With: {attendee_str}")
+        if not m["meeting_url"]:
+            lines.append("\nNo meeting link found on this event.")
+
+        text = "\n".join(lines)
+
+        buttons = []
         if m["meeting_url"]:
-            link_str = f"\n   Link: {m['meeting_url']}"
+            cache_key = _cache_meeting(m["event_id"], m["meeting_url"], m["summary"])
+            buttons.append([
+                InlineKeyboardButton("Audio Delegate", callback_data=f"audio:{cache_key}"),
+                InlineKeyboardButton("Video Delegate", callback_data=f"video:{cache_key}"),
+            ])
+            buttons.append([
+                InlineKeyboardButton("Send with Context", callback_data=f"context:{cache_key}"),
+                InlineKeyboardButton("Skip", callback_data=f"skip:{cache_key}"),
+            ])
+        else:
+            buttons.append([
+                InlineKeyboardButton("Skip", callback_data=f"skip:{m['event_id']}"),
+            ])
 
-        lines.append(f"• {time_str} — {m['summary']}{attendee_str}{link_str}")
-
-    await update.message.reply_text("\n".join(lines))
+        keyboard = InlineKeyboardMarkup(buttons)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text,
+            reply_markup=keyboard,
+        )
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
