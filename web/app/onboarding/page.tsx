@@ -7,6 +7,7 @@ const TELEGRAM_BOT_USERNAME =
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "ClaudeDelegateBot";
 
 const STEPS = [
+  { id: "welcome", title: "Welcome", subtitle: "Meet your AI delegate" },
   { id: "signin", title: "Sign In", subtitle: "Connect your Google account" },
   { id: "voice", title: "Voice Clone", subtitle: "Record 30 seconds" },
   {
@@ -51,10 +52,12 @@ export default function OnboardingPage() {
   const canProceed = (() => {
     switch (currentStep) {
       case 0:
-        return false; // Sign-in step uses its own button
+        return true; // Welcome step
       case 1:
-        return voiceBlob !== null;
+        return false; // Sign-in step uses its own button
       case 2:
+        return voiceBlob !== null;
+      case 3:
         return true;
       default:
         return true;
@@ -70,7 +73,7 @@ export default function OnboardingPage() {
   const handleNext = async () => {
     setIsSubmitting(true);
     try {
-      if (currentStep === 1 && voiceBlob) {
+      if (currentStep === 2 && voiceBlob) {
         // Leaving voice step — upload immediately
         const voiceForm = new FormData();
         voiceForm.append("audio", voiceBlob, "voice.webm");
@@ -78,7 +81,7 @@ export default function OnboardingPage() {
         await fetch("/api/voice-clone", { method: "POST", body: voiceForm });
       }
 
-      if (currentStep === 2) {
+      if (currentStep === 3) {
         // Leaving Telegram step — finalize onboarding
         await fetch("/api/onboarding/complete", {
           method: "POST",
@@ -163,40 +166,107 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
       {/* Progress bar */}
-      <div className="border-b border-zinc-800">
-        <div className="max-w-2xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-1">
-            {STEPS.map((s, i) => (
-              <div key={s.id} className="flex-1 flex items-center">
-                <div
-                  className={`h-1 w-full rounded-full transition-colors ${
-                    i <= currentStep ? "bg-orange-500" : "bg-zinc-800"
-                  }`}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex justify-between text-xs text-zinc-500">
-            <span>
-              Step {currentStep + 1} of {STEPS.length}
-            </span>
-            <span>{step.title}</span>
+      {currentStep > 0 && (
+        <div className="border-b border-zinc-800">
+          <div className="max-w-2xl mx-auto px-6 py-4">
+            <div className="flex items-center gap-1">
+              {STEPS.slice(1).map((s, i) => (
+                <div key={s.id} className="flex-1 flex items-center">
+                  <div
+                    className={`h-1 w-full rounded-full transition-colors ${
+                      i < currentStep ? "bg-orange-500" : "bg-zinc-800"
+                    }`}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex justify-between text-xs text-zinc-500">
+              <span>
+                Step {currentStep} of {STEPS.length - 1}
+              </span>
+              <span>{step.title}</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-lg">
           {/* Step header */}
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white">{step.title}</h2>
-            <p className="text-zinc-400 mt-1">{step.subtitle}</p>
-          </div>
+          {currentStep > 0 && (
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-white">{step.title}</h2>
+              <p className="text-zinc-400 mt-1">{step.subtitle}</p>
+            </div>
+          )}
 
           {/* Step content */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className={currentStep === 0 ? "" : "bg-zinc-900 border border-zinc-800 rounded-2xl p-6"}>
             {currentStep === 0 && (
+              <div className="space-y-8 text-center">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-pink-600">
+                  <svg
+                    className="w-10 h-10 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white mb-3">Claude Delegate</h2>
+                  <p className="text-zinc-400 text-base max-w-sm mx-auto">
+                    An AI agent that attends meetings for you — with your voice, your context, and your knowledge.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 text-left">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                    <div className="text-orange-400 mb-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-white font-medium text-xs">Your Voice</h3>
+                    <p className="text-zinc-500 text-xs mt-1">Sounds like you</p>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                    <div className="text-orange-400 mb-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-white font-medium text-xs">Your Context</h3>
+                    <p className="text-zinc-500 text-xs mt-1">Your knowledge base</p>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                    <div className="text-orange-400 mb-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-white font-medium text-xs">Real Meetings</h3>
+                    <p className="text-zinc-500 text-xs mt-1">Zoom & Google Meet</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleNext}
+                  className="w-full px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-xl transition-colors"
+                >
+                  Get Started
+                </button>
+              </div>
+            )}
+
+            {currentStep === 1 && (
               <div className="space-y-6 text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-zinc-800">
                   <svg
@@ -247,11 +317,11 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {currentStep === 1 && (
+            {currentStep === 2 && (
               <VoiceCapture onComplete={setVoiceBlob} />
             )}
 
-            {currentStep === 2 && (
+            {currentStep === 3 && (
               <div className="space-y-6">
                 <div className="text-center">
                   <p className="text-zinc-400 text-sm mb-1">
@@ -265,7 +335,10 @@ export default function OnboardingPage() {
                     href={`https://t.me/${TELEGRAM_BOT_USERNAME}?start=${telegramToken}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => setTelegramOpened(true)}
+                    onClick={() => {
+                      setTelegramOpened(true);
+                      handleNext();
+                    }}
                     className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
                       telegramOpened
                         ? "border-blue-500/50 bg-blue-500/10"
@@ -298,7 +371,7 @@ export default function OnboardingPage() {
                         Opened
                       </span>
                     ) : (
-                      <span className="text-xs text-zinc-500">Connect</span>
+                      <span className="px-4 py-2 bg-orange-600 text-white font-medium text-sm rounded-xl">Connect</span>
                     )}
                   </a>
                 ) : (
@@ -312,32 +385,34 @@ export default function OnboardingPage() {
           </div>
 
           {/* Navigation */}
-          <div className="flex justify-between mt-6">
-            {currentStep > 1 ? (
-              <button
-                onClick={handleBack}
-                className="px-4 py-2 text-zinc-400 hover:text-white transition-colors"
-              >
-                Back
-              </button>
-            ) : (
-              <div />
-            )}
+          {currentStep !== 0 && currentStep !== 3 && (
+            <div className="flex justify-between mt-6">
+              {currentStep > 1 ? (
+                <button
+                  onClick={handleBack}
+                  className="px-4 py-2 text-zinc-400 hover:text-white transition-colors"
+                >
+                  Back
+                </button>
+              ) : (
+                <div />
+              )}
 
-            {currentStep > 0 && (
-              <button
-                onClick={handleNext}
-                disabled={!canProceed || isSubmitting}
-                className="px-6 py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
-              >
-                {isSubmitting
-                  ? "Setting up..."
-                  : currentStep === STEPS.length - 1
-                    ? "Complete Setup"
-                    : "Continue"}
-              </button>
-            )}
-          </div>
+              {currentStep > 0 && (
+                <button
+                  onClick={handleNext}
+                  disabled={!canProceed || isSubmitting}
+                  className="px-6 py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+                >
+                  {isSubmitting
+                    ? "Setting up..."
+                    : currentStep === STEPS.length - 1
+                      ? "Complete Setup"
+                      : "Continue"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
