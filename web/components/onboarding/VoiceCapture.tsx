@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from "react";
 
 interface VoiceCaptureProps {
   onComplete: (audioBlob: Blob) => void;
+  onContinue?: () => void;
 }
 
-export default function VoiceCapture({ onComplete }: VoiceCaptureProps) {
+export default function VoiceCapture({ onComplete, onContinue }: VoiceCaptureProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -107,13 +108,21 @@ export default function VoiceCapture({ onComplete }: VoiceCaptureProps) {
         {audioUrl ? (
           <>
             {/* Playback + re-record */}
-            <audio src={audioUrl} controls className="w-full max-w-xs h-10" />
+            <audio src={audioUrl} controls className="w-full h-10" />
             <button
               onClick={resetRecording}
-              className="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors text-sm"
+              className="w-full px-4 py-2 rounded-xl border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors text-sm"
             >
               Re-record
             </button>
+            {onContinue && (
+              <button
+                onClick={onContinue}
+                className="w-full px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-xl transition-colors"
+              >
+                Continue
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -149,7 +158,7 @@ export default function VoiceCapture({ onComplete }: VoiceCaptureProps) {
             {/* Start / Stop button */}
             <button
               onClick={isRecording ? stopRecording : startRecording}
-              className={`px-6 py-3 rounded-xl font-medium transition-all ${
+              className={`w-full px-6 py-3 rounded-xl font-medium transition-all ${
                 isRecording
                   ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
                   : "bg-orange-600 hover:bg-orange-700 text-white"

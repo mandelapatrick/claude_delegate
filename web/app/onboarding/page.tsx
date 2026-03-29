@@ -318,7 +318,7 @@ export default function OnboardingPage() {
             )}
 
             {currentStep === 2 && (
-              <VoiceCapture onComplete={setVoiceBlob} />
+              <VoiceCapture onComplete={setVoiceBlob} onContinue={handleNext} />
             )}
 
             {currentStep === 3 && (
@@ -384,35 +384,6 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          {/* Navigation */}
-          {currentStep !== 0 && currentStep !== 3 && (
-            <div className="flex justify-between mt-6">
-              {currentStep > 1 ? (
-                <button
-                  onClick={handleBack}
-                  className="px-4 py-2 text-zinc-400 hover:text-white transition-colors"
-                >
-                  Back
-                </button>
-              ) : (
-                <div />
-              )}
-
-              {currentStep > 0 && (
-                <button
-                  onClick={handleNext}
-                  disabled={!canProceed || isSubmitting}
-                  className="px-6 py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
-                >
-                  {isSubmitting
-                    ? "Setting up..."
-                    : currentStep === STEPS.length - 1
-                      ? "Complete Setup"
-                      : "Continue"}
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>
