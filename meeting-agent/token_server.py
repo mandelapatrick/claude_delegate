@@ -8,6 +8,7 @@ Serves as the backend for the Claude Code plugin:
 4. Serves the bridge webpage for Recall.ai Output Media
 """
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -147,17 +148,25 @@ async def dispatch_agent(request: Request):
         }
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{RECALL_BASE_URL}/bot/",
-            headers={
-                "Authorization": f"Token {RECALL_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=recall_body,
-            timeout=30.0,
-        )
+        for attempt in range(3):
+            resp = await client.post(
+                f"{RECALL_BASE_URL}/bot/",
+                headers={
+                    "Authorization": f"Token {RECALL_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=recall_body,
+                timeout=30.0,
+            )
+            if resp.status_code == 429 and attempt < 2:
+                retry_after = int(resp.headers.get("Retry-After", 2 ** attempt))
+                print(f"[dispatch] Recall.ai 429, retrying in {retry_after}s (attempt {attempt + 1}/3)")
+                await asyncio.sleep(retry_after)
+                continue
+            break
 
     if not resp.is_success:
+        print(f"[dispatch] Recall.ai error {resp.status_code}: {resp.text}")
         return JSONResponse(
             {"error": f"Recall.ai error ({resp.status_code}): {resp.text}"},
             status_code=resp.status_code,
