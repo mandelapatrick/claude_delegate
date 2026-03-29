@@ -260,10 +260,10 @@ async def _handle_dispatch(update: Update, mode: str) -> None:
     mode_label = "video" if mode == "video" else "audio"
     _active_dispatches.add(chat_id)
     try:
-        await query.edit_message_text(f"Dispatching {mode_label} agent... (this may take a moment)")
+        await query.edit_message_text("Dispatching agent... (this may take a moment)")
         result = await _dispatch_agent(user, meeting["meeting_url"], meeting.get("summary", "Meeting"), mode=mode)
         await query.edit_message_text(
-            f"Agent dispatched ({mode_label})!\nSession: {result.get('sessionId', 'started')}"
+            f"Agent dispatched!\nSession: {result.get('sessionId', 'started')}"
         )
     except Exception as e:
         logger.exception("Dispatch failed")
@@ -335,10 +335,10 @@ async def receive_context(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     _active_dispatches.add(chat_id)
     try:
-        msg = await update.message.reply_text("Dispatching audio agent with context...")
+        msg = await update.message.reply_text("Dispatching agent with context...")
         result = await _dispatch_agent(user, meeting_url, meeting_title, context=user_context, mode="audio")
         await msg.edit_text(
-            f"Agent dispatched (audio)!\n"
+            f"Agent dispatched!\n"
             f"Session: {result.get('sessionId', 'started')}\n\n"
             f"Context: \"{user_context}\""
         )
@@ -381,10 +381,10 @@ async def context_mode_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     _active_dispatches.add(chat_id)
     try:
-        await query.edit_message_text(f"Dispatching {mode} agent with context...")
+        await query.edit_message_text("Dispatching agent with context...")
         result = await _dispatch_agent(user, meeting_url, meeting_title, context=user_context, mode=mode)
         await query.edit_message_text(
-            f"Agent dispatched ({mode})!\n"
+            f"Agent dispatched!\n"
             f"Session: {result.get('sessionId', 'started')}\n\n"
             f"Context: \"{user_context}\""
         )
