@@ -18,7 +18,7 @@ from telegram.ext import (
     filters,
 )
 
-from calendar_poller import poll_all_users, get_cached_meeting
+from calendar_poller import poll_all_users, get_cached_meeting, list_meetings_for_user
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -134,15 +134,39 @@ async def meetings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Please connect your account first via the onboarding link.")
         return
 
-    await update.message.reply_text("Checking your calendar... I'll send notifications for upcoming meetings.")
-    # Trigger an immediate poll for this user
-    await poll_all_users(
-        context.application,
-        supabase,
-        GOOGLE_CLIENT_ID,
-        GOOGLE_CLIENT_SECRET,
-        PROXY_URL,
-    )
+    await update.message.reply_text("Checking your calendar...")
+
+    try:
+        meetings = await list_meetings_for_user(
+            supabase, user, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+        )
+    except Exception:
+        logger.exception("Failed to fetch meetings for user %s", user["id"])
+        await update.message.reply_text("Failed to fetch your calendar. Please try again later.")
+        return
+
+    if not meetings:
+        await update.message.reply_text("No upcoming meetings found for today.")
+        return
+
+    lines = [f"You have {len(meetings)} upcoming meeting(s) today:\n"]
+    for m in meetings:
+        time_str = m["start_dt"].strftime("%I:%M %p")
+        attendee_str = ""
+        if m["attendees"]:
+            names = m["attendees"][:3]
+            attendee_str = ", ".join(names)
+            if len(m["attendees"]) > 3:
+                attendee_str += f" +{len(m['attendees']) - 3} more"
+            attendee_str = f"\n   With: {attendee_str}"
+
+        link_str = ""
+        if m["meeting_url"]:
+            link_str = f"\n   Link: {m['meeting_url']}"
+
+        lines.append(f"• {time_str} — {m['summary']}{attendee_str}{link_str}")
+
+    await update.message.reply_text("\n".join(lines))
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -71,6 +71,79 @@ def _format_time_until(start_dt: datetime) -> str:
     return f"in {minutes} min"
 
 
+async def list_meetings_for_user(
+    supabase: Client,
+    user: dict,
+    google_client_id: str,
+    google_client_secret: str,
+) -> list[dict]:
+    """Fetch today's remaining meetings for a single user. Returns list of event dicts."""
+    token_result = (
+        supabase.table("connector_tokens")
+        .select("access_token, refresh_token, expires_at")
+        .eq("user_id", user["id"])
+        .eq("provider", "google")
+        .single()
+        .execute()
+    )
+    token_row = token_result.data
+    if not token_row or not token_row.get("refresh_token"):
+        return []
+
+    creds = Credentials(
+        token=token_row["access_token"],
+        refresh_token=token_row["refresh_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=google_client_id,
+        client_secret=google_client_secret,
+    )
+
+    if creds.expired or not creds.valid:
+        from google.auth.transport.requests import Request
+        creds.refresh(Request())
+        supabase.table("connector_tokens").update({
+            "access_token": creds.token,
+            "expires_at": creds.expiry.isoformat() if creds.expiry else None,
+        }).eq("user_id", user["id"]).eq("provider", "google").execute()
+
+    service = build("calendar", "v3", credentials=creds)
+    now_dt = datetime.now(timezone.utc)
+    end_of_day = (now_dt + timedelta(hours=24)).replace(hour=23, minute=59, second=59)
+
+    events_result = (
+        service.events()
+        .list(
+            calendarId="primary",
+            timeMin=now_dt.isoformat(),
+            timeMax=end_of_day.isoformat(),
+            singleEvents=True,
+            orderBy="startTime",
+        )
+        .execute()
+    )
+
+    meetings = []
+    for event in events_result.get("items", []):
+        summary = event.get("summary", "Untitled Meeting")
+        start = event["start"].get("dateTime", event["start"].get("date"))
+        start_dt = datetime.fromisoformat(start)
+        meeting_url = _extract_meeting_url(event)
+        attendees = [
+            a.get("displayName") or a.get("email", "")
+            for a in event.get("attendees", [])
+            if not a.get("self")
+        ]
+        meetings.append({
+            "summary": summary,
+            "start_dt": start_dt,
+            "meeting_url": meeting_url,
+            "attendees": attendees,
+            "event_id": event["id"],
+        })
+
+    return meetings
+
+
 async def poll_all_users(
     app: Application,
     supabase: Client,
