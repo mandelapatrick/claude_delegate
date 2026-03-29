@@ -67,7 +67,7 @@ async def _dispatch_agent(
         "meetingUrl": meeting_url,
         "meetingTitle": meeting_title,
         "meetingId": meeting_url,
-        "botName": f"{user['name']}'s Delegate",
+        "botName": f"{user['name']}'s Agent",
         "context": context,
         "mode": mode,
     }
@@ -98,7 +98,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     args = context.args
     if not args:
         await update.message.reply_text(
-            "Welcome to Claude Delegate!\n\n"
+            "Welcome to Meeting Agent!\n\n"
             "To connect your account, use the link from your onboarding page.\n"
             "It looks like: t.me/ClaudeDelegateBot?start=<your-token>"
         )
@@ -131,10 +131,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     await update.message.reply_text(
         f"Connected! Hi {user['name']}.\n\n"
-        "I'll notify you before upcoming meetings so you can send your delegate.\n\n"
+        "I'll notify you before upcoming meetings so you can send your agent.\n\n"
         "Commands:\n"
         "/meetings — Check upcoming meetings\n"
-        "/status — Check delegate status"
+        "/status — Check agent status"
     )
 
 
@@ -223,10 +223,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     sessions = result.data or []
     if not sessions:
-        await update.message.reply_text("No active delegate sessions.")
+        await update.message.reply_text("No active agent sessions.")
         return
 
-    lines = ["Active delegate sessions:\n"]
+    lines = ["Active agent sessions:\n"]
     for s in sessions:
         lines.append(f"  {s['meeting_title']} — {s['status']}")
 
@@ -260,14 +260,14 @@ async def _handle_dispatch(update: Update, mode: str) -> None:
     mode_label = "video" if mode == "video" else "audio"
     _active_dispatches.add(chat_id)
     try:
-        await query.edit_message_text(f"Dispatching {mode_label} delegate... (this may take a moment)")
+        await query.edit_message_text(f"Dispatching {mode_label} agent... (this may take a moment)")
         result = await _dispatch_agent(user, meeting["meeting_url"], meeting.get("summary", "Meeting"), mode=mode)
         await query.edit_message_text(
-            f"Delegate dispatched ({mode_label})!\nSession: {result.get('sessionId', 'started')}"
+            f"Agent dispatched ({mode_label})!\nSession: {result.get('sessionId', 'started')}"
         )
     except Exception as e:
         logger.exception("Dispatch failed")
-        await query.edit_message_text(f"Failed to dispatch delegate: {e}")
+        await query.edit_message_text(f"Failed to dispatch agent: {e}")
     finally:
         _active_dispatches.discard(chat_id)
 
@@ -286,7 +286,7 @@ async def skip_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Handle 'Skip' button press."""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("Skipped. Won't send a delegate to this meeting.")
+    await query.edit_message_text("Skipped. Won't send an agent to this meeting.")
 
 
 async def context_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -305,7 +305,7 @@ async def context_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     context.user_data["pending_meeting_title"] = meeting.get("summary", "Meeting")
 
     await query.edit_message_text(
-        "How should your delegate show up in this meeting?\n\n"
+        "How should your agent show up in this meeting?\n\n"
         "Type your instructions (e.g., \"Focus on the budget discussion, "
         "I'm bearish on Q3 projections\"):"
     )
@@ -335,16 +335,16 @@ async def receive_context(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     _active_dispatches.add(chat_id)
     try:
-        msg = await update.message.reply_text("Dispatching audio delegate with context...")
+        msg = await update.message.reply_text("Dispatching audio agent with context...")
         result = await _dispatch_agent(user, meeting_url, meeting_title, context=user_context, mode="audio")
         await msg.edit_text(
-            f"Delegate dispatched (audio)!\n"
+            f"Agent dispatched (audio)!\n"
             f"Session: {result.get('sessionId', 'started')}\n\n"
             f"Context: \"{user_context}\""
         )
     except Exception as e:
         logger.exception("Dispatch with context failed")
-        await update.message.reply_text(f"Failed to dispatch delegate: {e}")
+        await update.message.reply_text(f"Failed to dispatch agent: {e}")
     finally:
         _active_dispatches.discard(chat_id)
 
@@ -381,16 +381,16 @@ async def context_mode_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     _active_dispatches.add(chat_id)
     try:
-        await query.edit_message_text(f"Dispatching {mode} delegate with context...")
+        await query.edit_message_text(f"Dispatching {mode} agent with context...")
         result = await _dispatch_agent(user, meeting_url, meeting_title, context=user_context, mode=mode)
         await query.edit_message_text(
-            f"Delegate dispatched ({mode})!\n"
+            f"Agent dispatched ({mode})!\n"
             f"Session: {result.get('sessionId', 'started')}\n\n"
             f"Context: \"{user_context}\""
         )
     except Exception as e:
         logger.exception("Dispatch with context failed")
-        await query.edit_message_text(f"Failed to dispatch delegate: {e}")
+        await query.edit_message_text(f"Failed to dispatch agent: {e}")
     finally:
         _active_dispatches.discard(chat_id)
 
@@ -405,7 +405,7 @@ async def cancel_context(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Cancel the context input."""
     context.user_data.pop("pending_meeting_url", None)
     context.user_data.pop("pending_meeting_title", None)
-    await update.message.reply_text("Cancelled. Your delegate won't join this meeting.")
+    await update.message.reply_text("Cancelled. Your agent won't join this meeting.")
     return ConversationHandler.END
 
 

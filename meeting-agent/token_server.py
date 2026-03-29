@@ -91,7 +91,7 @@ async def dispatch_agent(request: Request):
     meeting_url = body.get("meetingUrl")
     meeting_title = body.get("meetingTitle", "Meeting")
     meeting_id = body.get("meetingId", "")
-    bot_name = body.get("botName", "Delegate")
+    bot_name = body.get("botName", "Agent")
     user_id = body.get("userId", "")
     user_context = body.get("context", "")
     mode = body.get("mode", "audio")
