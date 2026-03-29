@@ -42,9 +42,7 @@ class MeetingDelegate(Agent):
         meeting_context = load_meeting_context(meeting_title)
         context_block = f"\n{name}'s knowledge base:\n{meeting_context}"
         if user_context:
-            context_block += (
-                f"\n\n{name}'s instructions for this meeting:\n{user_context}"
-            )
+            context_block += f"\n\n{user_context}"
 
         title_line = f' titled "{meeting_title}"' if meeting_title != "Meeting" else ""
 
