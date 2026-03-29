@@ -104,57 +104,60 @@ export default function VoiceCapture({ onComplete }: VoiceCaptureProps) {
 
       {/* Recording controls */}
       <div className="flex flex-col items-center gap-4">
-        {/* Progress ring */}
-        <div className="relative w-24 h-24">
-          <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
-            <circle
-              cx="48"
-              cy="48"
-              r="42"
-              fill="none"
-              stroke="#27272a"
-              strokeWidth="4"
-            />
-            <circle
-              cx="48"
-              cy="48"
-              r="42"
-              fill="none"
-              stroke={isRecording ? "#ef4444" : audioUrl ? "#22c55e" : "#71717a"}
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={`${2 * Math.PI * 42}`}
-              strokeDashoffset={`${2 * Math.PI * 42 * (1 - progress / 100)}`}
-              className="transition-all duration-1000"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-2xl font-mono text-white">{timeLeft}s</span>
-          </div>
-        </div>
-
-        {/* Buttons */}
-        {!audioUrl ? (
-          <button
-            onClick={isRecording ? stopRecording : startRecording}
-            className={`px-6 py-3 rounded-xl font-medium transition-all ${
-              isRecording
-                ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
-                : "bg-orange-600 hover:bg-orange-700 text-white"
-            }`}
-          >
-            {isRecording ? "Stop Recording" : "Start Recording"}
-          </button>
-        ) : (
-          <div className="flex gap-3">
+        {audioUrl ? (
+          <>
+            {/* Playback + re-record */}
+            <audio src={audioUrl} controls className="w-full max-w-xs h-10" />
             <button
               onClick={resetRecording}
-              className="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+              className="px-4 py-2 rounded-xl border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors text-sm"
             >
               Re-record
             </button>
-            <audio src={audioUrl} controls className="h-10" />
-          </div>
+          </>
+        ) : (
+          <>
+            {/* Progress ring */}
+            <div className="relative w-24 h-24">
+              <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="42"
+                  fill="none"
+                  stroke="#27272a"
+                  strokeWidth="4"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="42"
+                  fill="none"
+                  stroke={isRecording ? "#ef4444" : "#71717a"}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 42}`}
+                  strokeDashoffset={`${2 * Math.PI * 42 * (1 - progress / 100)}`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl font-mono text-white">{timeLeft}s</span>
+              </div>
+            </div>
+
+            {/* Start / Stop button */}
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`px-6 py-3 rounded-xl font-medium transition-all ${
+                isRecording
+                  ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
+                  : "bg-orange-600 hover:bg-orange-700 text-white"
+              }`}
+            >
+              {isRecording ? "Stop Recording" : "Start Recording"}
+            </button>
+          </>
         )}
       </div>
 
