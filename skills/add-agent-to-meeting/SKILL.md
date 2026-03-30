@@ -20,8 +20,8 @@ Dispatch your embodied AI delegate to attend a meeting on your behalf. The agent
 3. If a meeting name is provided, call `list_meetings` and fuzzy-match the name.
 4. The meeting URL is returned by `list_meetings` in the `meetingUrl` field.
 5. Confirm with the user before dispatching: show meeting title, time, and attendees.
-6. Ask the user: "Any context or instructions for your agent?" Examples: "Focus on budget discussion", "Take notes on action items", "I'm the project lead, represent my interests". This is optional — if the user says no or skips, dispatch without context.
-7. Call `add_agent_to_meeting` with the `meeting_url`, `meeting_title`, and optional `context`.
+6. **MANDATORY — DO NOT SKIP THIS STEP.** Before dispatching, you MUST ask the user: "How should your agent show up in this meeting? Any context or instructions?" Give examples like "Focus on budget discussion", "Take notes on action items", "I'm the project lead, represent my interests". Wait for the user's response. If they say "no" or "none" or "just send it", dispatch without context. But you MUST ask first — never dispatch without prompting for context.
+7. Call `add_agent_to_meeting` with the `meeting_url`, `meeting_title`, and optional `context` from the user's response.
 8. Report the agent status (joining, waiting room, active).
 
 ## Agent Behavior
