@@ -303,7 +303,6 @@ async def onboarding_status(request: Request):
             "completed": False,
             "steps": {
                 "profile": False, "voiceClone": False,
-                "avatar": False, "connectors": False, "paraSetup": False,
             },
         })
 
@@ -324,7 +323,6 @@ async def onboarding_status(request: Request):
         "steps": {
             "profile": has_profile,
             "voiceClone": has_voice,
-            "telegram": bool(user.get("telegram_chat_id")),
         },
     })
 

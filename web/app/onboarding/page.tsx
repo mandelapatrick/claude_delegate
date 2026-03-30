@@ -3,18 +3,10 @@
 import { useState, useEffect } from "react";
 import VoiceCapture from "@/components/onboarding/VoiceCapture";
 
-const TELEGRAM_BOT_USERNAME =
-  process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "ClaudeDelegateBot";
-
 const STEPS = [
   { id: "welcome", title: "Welcome", subtitle: "Meet your AI agent" },
   { id: "signin", title: "Sign In", subtitle: "Connect your Google account" },
   { id: "voice", title: "Voice Clone", subtitle: "Record 30 seconds" },
-  {
-    id: "telegram",
-    title: "Connect Telegram",
-    subtitle: "Get meeting notifications",
-  },
 ];
 
 const STEP_INDEX: Record<string, number> = {};
@@ -25,9 +17,7 @@ STEPS.forEach((s, i) => {
 export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [profileData, setProfileData] = useState({ name: "", email: "" });
-  const [telegramToken, setTelegramToken] = useState<string | null>(null);
   const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
-  const [telegramOpened, setTelegramOpened] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
 
@@ -38,14 +28,11 @@ export default function OnboardingPage() {
     const google = params.get("google");
     const name = params.get("name");
     const email = params.get("email");
-    const token = params.get("telegram_token");
-
     if (google === "connected" && step && STEP_INDEX[step] !== undefined) {
       setCurrentStep(STEP_INDEX[step]);
       if (name) setProfileData((p) => ({ ...p, name: decodeURIComponent(name) }));
       if (email)
         setProfileData((p) => ({ ...p, email: decodeURIComponent(email) }));
-      if (token) setTelegramToken(token);
     }
   }, []);
 
@@ -57,8 +44,6 @@ export default function OnboardingPage() {
         return false; // Sign-in step uses its own button
       case 2:
         return voiceBlob !== null;
-      case 3:
-        return true;
       default:
         return true;
     }
@@ -74,37 +59,13 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
     try {
       if (currentStep === 2 && voiceBlob) {
-        // Leaving voice step — upload immediately
+        // Leaving voice step — upload and finalize onboarding
         const voiceForm = new FormData();
         voiceForm.append("audio", voiceBlob, "voice.webm");
         voiceForm.append("email", profileData.email);
         await fetch("/api/voice-clone", { method: "POST", body: voiceForm });
 
-        // Notify proxy session early so MCP plugin users get identity
-        // (they may skip Telegram since the plugin is their interface)
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get("session");
-        if (sessionId) {
-          try {
-            await fetch(
-              `https://meeting-agent-h4ny.onrender.com/api/onboarding/session/${sessionId}/complete`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  email: profileData.email,
-                  name: profileData.name,
-                }),
-              }
-            );
-          } catch {
-            // Non-critical
-          }
-        }
-      }
-
-      if (currentStep === 3) {
-        // Leaving Telegram step — finalize onboarding
+        // Finalize onboarding
         await fetch("/api/onboarding/complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -177,8 +138,8 @@ export default function OnboardingPage() {
             Your Agent is Ready
           </h3>
           <p className="text-zinc-400 text-sm max-w-sm mx-auto">
-            You can close this page. Your agent will notify you on Telegram
-            before upcoming meetings.
+            You can close this page and return to Claude Code. Run
+            /list-meetings to see your upcoming meetings.
           </p>
         </div>
       </div>
@@ -343,67 +304,6 @@ export default function OnboardingPage() {
               <VoiceCapture onComplete={setVoiceBlob} onContinue={handleNext} />
             )}
 
-            {currentStep === 3 && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <p className="text-zinc-400 text-sm mb-1">
-                    Connect Telegram to get meeting notifications and control
-                    your agent via chat.
-                  </p>
-                </div>
-
-                {telegramToken ? (
-                  <a
-                    href={`https://t.me/${TELEGRAM_BOT_USERNAME}?start=${telegramToken}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => {
-                      setTelegramOpened(true);
-                      handleNext();
-                    }}
-                    className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                      telegramOpened
-                        ? "border-blue-500/50 bg-blue-500/10"
-                        : "border-zinc-800 bg-zinc-900 hover:border-zinc-700"
-                    }`}
-                  >
-                    <div
-                      className={`flex-shrink-0 ${
-                        telegramOpened ? "text-blue-400" : "text-zinc-500"
-                      }`}
-                    >
-                      <svg
-                        className="w-6 h-6"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-white font-medium text-sm">
-                        Open Telegram
-                      </span>
-                      <p className="text-zinc-500 text-xs mt-0.5">
-                        Click to connect your Telegram account
-                      </p>
-                    </div>
-                    {telegramOpened ? (
-                      <span className="text-xs text-blue-400 font-medium">
-                        Opened
-                      </span>
-                    ) : (
-                      <span className="px-4 py-2 bg-orange-600 text-white font-medium text-sm rounded-xl">Connect</span>
-                    )}
-                  </a>
-                ) : (
-                  <div className="text-center text-zinc-500 text-sm">
-                    Telegram link not available. Please complete Google sign-in
-                    first.
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
         </div>

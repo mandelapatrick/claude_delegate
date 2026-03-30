@@ -30233,8 +30233,7 @@ async function getOnboardingStatusHandler() {
   const status = await getOnboardingStatus();
   const stepLabels = {
     profile: "Name & Email",
-    voiceClone: "Voice Clone (30s recording)",
-    telegram: "Telegram Connected"
+    voiceClone: "Voice Clone (30s recording)"
   };
   let output = "## Onboarding Status\n\n";
   output += status.completed ? "Your delegate is fully set up and ready to go.\n\n" : "Your delegate setup is incomplete.\n\n";
@@ -30295,7 +30294,6 @@ async function openOnboardingHandler() {
     `Complete these steps in your browser:`,
     `1. Sign in with Google`,
     `2. Record 30 seconds of your voice`,
-    `3. Connect Telegram`,
     ``,
     `Your identity will be saved automatically when onboarding completes.`,
     `Then run \`/list-meetings\` to see your upcoming meetings.`

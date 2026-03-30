@@ -12,7 +12,6 @@ export async function getOnboardingStatusHandler() {
     const stepLabels = {
         profile: "Name & Email",
         voiceClone: "Voice Clone (30s recording)",
-        telegram: "Telegram Connected",
     };
     let output = "## Onboarding Status\n\n";
     output += status.completed
@@ -93,7 +92,6 @@ export async function openOnboardingHandler() {
         `Complete these steps in your browser:`,
         `1. Sign in with Google`,
         `2. Record 30 seconds of your voice`,
-        `3. Connect Telegram`,
         ``,
         `Your identity will be saved automatically when onboarding completes.`,
         `Then run \`/list-meetings\` to see your upcoming meetings.`,
