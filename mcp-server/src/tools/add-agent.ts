@@ -3,6 +3,7 @@ import { getOnboardingStatus, dispatchAgent } from "../services/proxy.js";
 export async function addAgentHandler(args: {
   meeting_url: string;
   meeting_title?: string;
+  context?: string;
 }): Promise<string> {
   const status = await getOnboardingStatus();
   if (!status.completed || !status.user) {
@@ -25,6 +26,7 @@ export async function addAgentHandler(args: {
     meetingId: meetingUrl,
     botName,
     userId: status.user.id,
+    context: args.context,
   });
 
   return [

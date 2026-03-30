@@ -28,6 +28,7 @@ server.tool(
   {
     meeting_url: z.string().describe("The meeting URL (Zoom or Google Meet link)"),
     meeting_title: z.string().optional().default("Meeting").describe("The meeting title"),
+    context: z.string().optional().describe("Optional context or instructions for the agent (e.g. 'Focus on budget discussion', 'Take notes on action items')"),
   },
   async (args) => ({
     content: [{ type: "text", text: await addAgentHandler(args) }],

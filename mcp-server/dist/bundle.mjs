@@ -30207,7 +30207,8 @@ async function addAgentHandler(args) {
     meetingTitle,
     meetingId: meetingUrl,
     botName,
-    userId: status.user.id
+    userId: status.user.id,
+    context: args.context
   });
   return [
     `## Delegate Dispatched`,
@@ -30486,7 +30487,8 @@ var server = new McpServer({
 });
 server.tool("add_agent_to_meeting", "Dispatch your AI delegate agent to join a specific meeting", {
   meeting_url: external_exports3.string().describe("The meeting URL (Zoom or Google Meet link)"),
-  meeting_title: external_exports3.string().optional().default("Meeting").describe("The meeting title")
+  meeting_title: external_exports3.string().optional().default("Meeting").describe("The meeting title"),
+  context: external_exports3.string().optional().describe("Optional context or instructions for the agent (e.g. 'Focus on budget discussion', 'Take notes on action items')")
 }, async (args) => ({
   content: [{ type: "text", text: await addAgentHandler(args) }]
 }));

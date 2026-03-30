@@ -102,6 +102,7 @@ export async function dispatchAgent(args: {
   meetingId: string;
   botName: string;
   userId: string;
+  context?: string;
 }): Promise<DispatchResult> {
   const response = await fetch(`${PROXY_URL}/api/dispatch`, {
     method: "POST",

@@ -17,6 +17,7 @@ export async function addAgentHandler(args) {
         meetingId: meetingUrl,
         botName,
         userId: status.user.id,
+        context: args.context,
     });
     return [
         `## Delegate Dispatched`,

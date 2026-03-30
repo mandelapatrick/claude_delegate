@@ -22,6 +22,7 @@ export declare function dispatchAgent(args: {
     meetingId: string;
     botName: string;
     userId: string;
+    context?: string;
 }): Promise<DispatchResult>;
 export interface OnboardingStatus {
     completed: boolean;
