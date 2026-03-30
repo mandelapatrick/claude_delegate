@@ -1,6 +1,6 @@
 {
   "name": "meeting-agent",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "AI meeting delegate that joins Google Meet and Zoom calls, listens, and responds using your cloned voice",
   "author": {
     "name": "mandelapatrick"
@@ -9,12 +9,11 @@
   "mcpServers": {
     "meeting-agent": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-server/dist/index.js"],
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-server/dist/bundle.mjs"],
       "cwd": "${CLAUDE_PLUGIN_ROOT}",
       "env": {
         "PROXY_URL": "https://meeting-agent-h4ny.onrender.com",
-        "APP_URL": "https://meeetingagent.vercel.app",
-        "NODE_PATH": "${CLAUDE_PLUGIN_DATA}/node_modules"
+        "APP_URL": "https://meeetingagent.vercel.app"
       }
     }
   }
