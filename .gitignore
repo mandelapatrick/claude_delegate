@@ -1,5 +1,6 @@
 node_modules/
-dist/
+# Keep mcp-server/dist/ tracked — plugin installs need the compiled JS
+!/mcp-server/dist/
 .next/
 .env
 .env.local
