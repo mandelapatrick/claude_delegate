@@ -30290,9 +30290,11 @@ async function openOnboardingHandler() {
   };
   pollForCompletion();
   return [
-    `Opening onboarding wizard at: ${onboardingUrl}`,
+    `## Open the onboarding wizard`,
     ``,
-    `Complete these steps in your browser:`,
+    `${onboardingUrl}`,
+    ``,
+    `Click the link above to open in your browser, then complete these steps:`,
     `1. Sign in with Google`,
     `2. Record 30 seconds of your voice`,
     ``,
