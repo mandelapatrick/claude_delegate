@@ -45,36 +45,45 @@ export async function saveIdentity(identity: {
   email: string;
   name: string;
 }): Promise<void> {
-  // When running as a plugin, identity comes from userConfig env vars — skip file writes
-  if (process.env.CLAUDE_PLUGIN_ROOT) {
-    return;
-  }
-
   const fs = await import("fs/promises");
   const path = await import("path");
+  const os = await import("os");
 
-  // Find .mcp.json — check cwd, then look for CLAUDE.md-adjacent
-  const mcpPath = path.resolve(process.cwd(), ".mcp.json");
-  let config: any;
+  // Always save to ~/.claude-delegate/identity.json (works in both plugin and standalone)
+  const identityDir = path.join(os.homedir(), ".claude-delegate");
+  const identityPath = path.join(identityDir, "identity.json");
   try {
-    config = JSON.parse(await fs.readFile(mcpPath, "utf-8"));
-  } catch {
-    config = { mcpServers: {} };
+    await fs.mkdir(identityDir, { recursive: true });
+    await fs.writeFile(
+      identityPath,
+      JSON.stringify(identity, null, 2) + "\n"
+    );
+  } catch (e) {
+    console.error("[saveIdentity] Failed to write identity file:", e);
   }
 
-  // Inject identity as env vars into the meeting-agent server config
-  const server =
-    config.mcpServers?.["meeting-agent"] ||
-    config.mcpServers?.["claude-delegate"];
-  if (server) {
-    server.env = {
-      ...server.env,
-      DELEGATE_EMAIL: identity.email,
-      DELEGATE_NAME: identity.name,
-    };
-    // Remove legacy google ID if present
-    delete server.env.DELEGATE_GOOGLE_ID;
-    await fs.writeFile(mcpPath, JSON.stringify(config, null, 2) + "\n");
+  // Also update .mcp.json env vars when running standalone (not as plugin)
+  if (!process.env.CLAUDE_PLUGIN_ROOT) {
+    const mcpPath = path.resolve(process.cwd(), ".mcp.json");
+    let config: any;
+    try {
+      config = JSON.parse(await fs.readFile(mcpPath, "utf-8"));
+    } catch {
+      config = { mcpServers: {} };
+    }
+
+    const server =
+      config.mcpServers?.["meeting-agent"] ||
+      config.mcpServers?.["claude-delegate"];
+    if (server) {
+      server.env = {
+        ...server.env,
+        DELEGATE_EMAIL: identity.email,
+        DELEGATE_NAME: identity.name,
+      };
+      delete server.env.DELEGATE_GOOGLE_ID;
+      await fs.writeFile(mcpPath, JSON.stringify(config, null, 2) + "\n");
+    }
   }
 }
 
